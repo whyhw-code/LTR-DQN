@@ -83,7 +83,7 @@ max_drawdown = results_df['drawdown'].min()
 calmar_ratio = ARR / abs(max_drawdown) if max_drawdown != 0 else np.nan
 
 # 夏普比率 (假设无风险利率为0.025)
-std_daily_return = results_df['day_return'].std()
+std_daily_return = results_df['day_return'].std()* np.sqrt(242)
 sharpe_ratio = (ARR - 0.025) / std_daily_return if std_daily_return != 0 else np.nan
 
 shenglv = shenglv_fenzi / shenglv_fenmu
