@@ -211,7 +211,7 @@ def mm():
         # results_df.to_csv(f'end/oc/batch{test_batch}/{dapan_code}return_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{chouyang_rate}1111.csv', index=False)
 
         # 初始金额
-        initial_amount = 5_000_000
+        initial_amount = 1_000_000
 
         # 年化收益率 (ARR)
         trading_days = results_df.shape[0]
@@ -226,7 +226,7 @@ def mm():
         calmar_ratio = ARR / abs(max_drawdown) if max_drawdown != 0 else np.nan
 
         # 夏普比率 (假设无风险利率为0.025)
-        std_daily_return = results_df['day_return'].std()
+        std_daily_return = results_df['day_return'].std()* np.sqrt(242)
         sharpe_ratio = (ARR - 0.025) / std_daily_return if std_daily_return != 0 else np.nan
 
         # 输出结果
@@ -238,7 +238,7 @@ def mm():
         return ARR,max_drawdown,calmar_ratio,sharpe_ratio, dqn_ARR,dqn_MDR,dqn_CR,dqn_SR
 
 def dqn_chouyang(df, xuanze_df):
-    initial_capital1 = 5000000
+    initial_capital1 = 1000000
     daily_results1 = []
     for qid_date1, group1 in df.groupby('qid_date'):
         xxx = xuanze_df.loc[xuanze_df['qid_date'] == qid_date1, '3068']
@@ -295,7 +295,7 @@ def dqn_chouyang(df, xuanze_df):
     # results_df1.to_csv(f'end/oc/batch{test_batch}/{dapan_code}return_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{chouyang_rate}dqn.csv', index=False)
 
     # 初始金额
-    initial_amount1 = 5_000_000
+    initial_amount1 = 1_000_000
 
     # 年化收益率 (ARR)
     trading_days1 = results_df1.shape[0]
@@ -310,7 +310,7 @@ def dqn_chouyang(df, xuanze_df):
     calmar_ratio = ARR / abs(max_drawdown) if max_drawdown != 0 else np.nan
 
     # 夏普比率 (假设无风险利率为0.025)
-    std_daily_return = results_df1['day_return'].std()
+    std_daily_return = results_df1['day_return'].std()* np.sqrt(242)
     sharpe_ratio = (ARR - 0.025) / std_daily_return if std_daily_return != 0 else np.nan
 
     # 输出结果
