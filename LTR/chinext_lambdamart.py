@@ -150,7 +150,7 @@ for group_size in test_groups:
 temp = yuan_test_df[['qid_date', 'stock_code', 'real_return', 'close', 'pclose']]
 
 temp.loc[:, "prediction"] = copy.deepcopy(predictions)
-#temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv')
+temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv')
 
 #
 if train_or_test == 'test':
@@ -207,7 +207,7 @@ if train_or_test == 'test':
     results_df = pd.DataFrame(daily_results)
 
     # print(results_df)
-    #results_df.to_csv(f'end/oc/batch{test_batch}/{dapan_code}return_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv', index=False)
+    results_df.to_csv(f'end/oc/batch{test_batch}/{dapan_code}return_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv', index=False)
 
     # 初始金额
     initial_amount = 5_000_000
@@ -236,6 +236,7 @@ if train_or_test == 'test':
     print(f"卡尔玛比率: {calmar_ratio:.3f}")
     print(f"夏普比率: {sharpe_ratio:.3f}")
     print(f"WR: {shenglv:.3f}")
+
 
 
 
