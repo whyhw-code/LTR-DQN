@@ -23,7 +23,7 @@ Xcol_name = ['page', 'advance_reaction', 'star_analyst', 'title_len', 'num_sente
 # Ycol_name = ['real_return']
 # Ycol_name = ['up_down']
 
-Reg_or_Class = 'lr'
+Reg_or_Class = 'xgbclass'
 dapan_code = '3068'
 test_batch = 123
 train_or_test = 'test'
@@ -78,9 +78,9 @@ elif Reg_or_Class == 'lr':
 
 # 定义要搜索的超参数网格
 param_grid = {
-    # 'n_estimators': [100, 150, 200],          # 树的数量
-    # 'max_depth': [3, 4],                  # 树的最大深度
-    # 'learning_rate': [0.01, 0.1]     # 学习率
+    'n_estimators': [100, 150, 200],          # 树的数量
+    'max_depth': [3, 4],                  # 树的最大深度
+    'learning_rate': [0.01, 0.1]     # 学习率
 }
 
 # 使用 GridSearchCV 进行网格搜索
@@ -92,4 +92,5 @@ grid_search.fit(X_train, y_train)
 
 # 输出最佳参数和最佳得分
 print("Best parameters found: ", grid_search.best_params_)
+
 print("Best cross-validation score: {:.4f}".format(np.sqrt(-grid_search.best_score_)))
