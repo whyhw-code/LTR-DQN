@@ -84,7 +84,8 @@ calmar_ratio = ARR / abs(max_drawdown) if max_drawdown != 0 else np.nan
 
 # 夏普比率 (假设无风险利率为0.025)
 std_daily_return = results_df['day_return'].std()
-sharpe_ratio = (ARR - 0.025) / std_daily_return if std_daily_return != 0 else np.nan
+sharpe_ratio = (((1 + results_df['day_return'].mean()) ** 242) - 1 - 0.025) / (
+            std_daily_return * 242 ** 0.5) if std_daily_return != 0 else np.nan
 
 shenglv = shenglv_fenzi / shenglv_fenmu
 
@@ -94,4 +95,8 @@ print(f"最大回撤率: {-max_drawdown:.3f}")
 print(f"卡尔玛比率: {calmar_ratio:.3f}")
 print(f"夏普比率: {sharpe_ratio:.3f}")
 print(f"WR: {shenglv:.3f}")
+
+# print(results_df)
+# results_df.to_csv(f'end/oc/all_report{dapan_code}return17_23.csv', index=False)
+
 
