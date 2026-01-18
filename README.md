@@ -8,7 +8,7 @@ This repository contains complete data and code to reproduce all experimental re
 
 Core Features
 
-- Data Scale: 145,000 analyst reports (Dec 2017 - Mar 2023) with 36+ engineered features
+- Data Scale: 145,000 analyst reports (Dec 2017 - Mar 2023) with 27 engineered features
 - Methodology: LambdaRank, LambdaMART, DQN, and 7 baseline models (Lasso, SVM, MLP, XGBoost)
 - Market Coverage: Main Board (主板) and ChiNext (创业板) markets
 - ESG Integration: Negative screening (NS) and Positive Impact (PI) strategies
