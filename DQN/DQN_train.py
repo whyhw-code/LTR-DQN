@@ -11,15 +11,15 @@ from dl_dqn2 import Environment, Agent
 if __name__ == '__main__':
     bankuaicode = '3068'
     LTR = 'ndcg'      #ndcg  pairwise11   pairmax11
-    train_year = 4
-    dec = 0.0001
-    test_batch = 3
+    train_year = 3
+    dec = 0.00015
+    test_batch = 123
     #12batch1,05batch2,09batch3
     data = pd.read_csv(f'data/dapan/{bankuaicode}merge.csv',
                        usecols=['trade_date', 'qid_date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'pct_chg', 'group_len'])
     temp_data = pd.read_csv(f'data/temp/oc/batch{test_batch}/{bankuaicode}temp_train_{LTR}_train{train_year}_0.0003_0.001_0.1_6_1000.csv',  #0.1_6   0.001_5
                             usecols=['qid_date', 'stock_code', 'real_return', 'prediction', 'close', 'pclose'])
-    env = Environment(data, temp_data, start_date=20180928, end_date=20220929)
+    env = Environment(data, temp_data, start_date=20181206, end_date=20211206)
     # gamma的折扣率它必须介于0和1之间。越大，折扣越小。这意味着学习，agent 更关心长期奖励。
     # 另一方面，gamma越小，折扣越大。这意味着我们的 agent 更关心短期奖励（最近的奶酪）。
     # epsilon探索率ϵ。即策略是以1−ϵ的概率选择当前最大价值的动作，以ϵ的概率随机选择新动作。
@@ -75,4 +75,5 @@ if __name__ == '__main__':
             plt.savefig(f'loss_train/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TEST.png')
             plt.show()
     agent.save_model(f'model/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TESToc')
+
 
