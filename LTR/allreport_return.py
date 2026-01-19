@@ -12,10 +12,10 @@ yinhaushui = 0.001
 all_df = pd.read_csv(f'data/{dapan_code}merge_open_close_final.csv', usecols=col_name)
 
 
-df = all_df[(20211207 <= all_df['qid_date']) & (all_df['qid_date'] <= 20230303)]
+df = all_df[(20171206 <= all_df['qid_date']) & (all_df['qid_date'] <= 20230303)]
 df.set_index('qid_date', inplace=True)
 
-initial_capital = 5000000
+initial_capital = 1000000
 daily_results = []
 shenglv_fenmu = 0
 shenglv_fenzi = 0
@@ -65,10 +65,10 @@ for qid_date, group in df.groupby('qid_date'):
 results_df = pd.DataFrame(daily_results)
 
 # print(results_df)
-# results_df.to_csv(f'end/oc/all_report{dapan_code}return17_23.csv', index=False)
+results_df.to_csv(f'end/oc/all_report{dapan_code}return17_2311.csv', index=False)
 
 # 初始金额
-initial_amount = 5_000_000
+initial_amount = 1_000_000
 
 # 年化收益率 (ARR)
 trading_days = results_df.shape[0]
@@ -95,8 +95,5 @@ print(f"最大回撤率: {-max_drawdown:.3f}")
 print(f"卡尔玛比率: {calmar_ratio:.3f}")
 print(f"夏普比率: {sharpe_ratio:.3f}")
 print(f"WR: {shenglv:.3f}")
-
-# print(results_df)
-# results_df.to_csv(f'end/oc/all_report{dapan_code}return17_23.csv', index=False)
 
 
