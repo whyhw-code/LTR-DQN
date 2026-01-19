@@ -94,7 +94,7 @@ print(f"年化收益率 (ARR): {ARR:.3f}")
 print(f"最大回撤率: {-max_drawdown:.3f}")
 print(f"卡尔玛比率: {calmar_ratio:.3f}")
 print(f"夏普比率: {sharpe_ratio:.3f}")
-#print(f"WR: {shenglv:.3f}")
+
 
 
 
