@@ -1,0 +1,26 @@
+Feature,SHAP_Importance (mean |SHAP|)
+advance_reaction,4.68E-06
+analyst_coverage,4.16E-06
+avg_sentence_len,3.89E-06
+broker_size,1.11E-05
+broker_status,1.00E-05
+cma,3.32E-06
+hml,1.19E-06
+ind_1,9.73E-06
+ind_2,1.91E-05
+ind_3,0
+ind_4,2.70E-07
+ind_5,1.68E-06
+ind_6,4.20E-06
+listed,4.15E-06
+num_authors,7.04E-07
+num_sentence,1.07E-05
+page,1.84E-05
+prior_performance_avg,2.25E-05
+prior_performance_sd,9.55E-08
+rm_rf,1.76E-05
+rmw,9.04E-06
+sd_sentence_len,6.45E-07
+smb,1.11E-05
+star_analyst,3.37E-06
+title_len,8.33E-06
