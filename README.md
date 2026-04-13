@@ -12,11 +12,10 @@
 
   ## 2. Repository Structure
 
-  - `data/`: raw data
-  - `model/`: reinforcement learning models
+  - `code/data/`: raw data
+  - `code/model/`: reinforcement learning models
   - `result/`: LTR-DQN results
-  - `temp/`: intermediate results
-  - `end/`: directory stores outputs of baseline models
+  - `code/temp/`: intermediate results
 
   ------
 
