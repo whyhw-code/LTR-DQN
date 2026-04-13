@@ -77,7 +77,7 @@
   ### 6.1 Main Scripts
 
   - `DQN_train.py`: DQN training script (used if model retraining is required)
-  - `dl_dqn1.py`, `dl_dqn2.py`: LTR-DQN model procedures
+  - `dl_dqn2.py`: LTR-DQN model procedures
   - `best_seed.py`: random seed selection or best experimental result screening
   - `T*.py`: scripts for generating tables in the paper
 
