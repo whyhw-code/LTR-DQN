@@ -176,7 +176,7 @@
   Please place the raw data in:
 
   ```text
-  data/
+  code/data/
   ```
 
   For details on data sources and acquisition methods, see Section 4.
