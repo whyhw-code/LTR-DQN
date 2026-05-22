@@ -418,24 +418,27 @@ The `temp_train` and `temp_test` files under `code/temp/oc/batch123/` are genera
 In the current reproduction package, these intermediate files are already provided. To avoid overwriting the supplied standard intermediate files when users rerun the scripts during reproduction, the saving statements in `T4M10.py` and `T4C10.py` are commented out by default. If users wish to regenerate these files from the prepared raw data, they should first uncomment the following statement:
 
 ```python
-temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}.csv')
+temp.to_csv(
+    f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{metric}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv',
+    index=False
+)
 ```
 
-Then run the corresponding commands in the `code/` directory. `train_or_test`, `shouxufei`, `yinhaushui`, and `learning_rate` can be specified via the command line. In particular, `train_or_test=train` generates training-period files, while `train_or_test=test` generates out-of-sample testing-period files.
+Then run the corresponding commands in the `code/` directory. `train_or_test`, `shouxufei`, `yinhaushui`, `learning_rate`, `max_depth`, and `n_estimators` can be specified via the command line. In particular, `train_or_test=train` generates training-period files, while `train_or_test=test` generates out-of-sample testing-period files.
 
 | Target file | Generation command |
 |---|---|
-| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2` |
-| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
-| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
+| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2` | --max_depth 5 --n_estimators 1000
+| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
+| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
 
-For files with `train_year=2` or `train_year=4`, users need to set `train_year` in the script to the corresponding value before running similar commands. For files whose names contain different maximum tree depths or numbers of estimators, such as `_4_1000`, `_6_1000`, `_5_800`, `_5_900`, `_5_1100`, and `_5_1200`, users need to adjust the corresponding LambdaMART parameters in the scripts before generating them.
+For files with `train_year=2` or `train_year=4`, users need to set `train_year` in the script to the corresponding value before running similar commands. For files whose names contain different maximum tree depths or numbers of estimators, such as `_4_1000`, `_6_1000`, `_5_800`, `_5_900`, `_5_1100`, and `_5_1200`, users can specify the corresponding `--max_depth` and `--n_estimators` values via the command line before generating them.
 
 ### 8.7 Retraining the DQN Model
 

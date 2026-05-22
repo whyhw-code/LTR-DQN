@@ -147,5 +147,8 @@ if __name__ == '__main__':
         #     plt.title('loss Over Time')
         #     plt.savefig(f'loss_train/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TEST.png')
         #     plt.show()
-    agent.save_model(f'model/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TESToc_{lr}')
+    if lr != 0.002:
+        agent.save_model(f'model/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TESToc_{lr}')
+    else:
+        agent.save_model(f'model/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_top4_train{train_year}TESToc')
 

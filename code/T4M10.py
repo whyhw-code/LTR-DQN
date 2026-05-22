@@ -36,7 +36,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--train_or_test', type=str, default='test', choices=['train', 'test'])
 parser.add_argument('--shouxufei', type=float, default=0.0003)
 parser.add_argument('--yinhaushui', type=float, default=0.001)
-parser.add_argument('--learning_rate', type=float, default=0.1)
+parser.add_argument('--learning_rate', type=float, default=0.001)
+parser.add_argument('--max_depth', type=int, default=5)
+parser.add_argument('--n_estimators', type=int, default=1000)
 
 args = parser.parse_args()
 
@@ -47,6 +49,8 @@ test_batch = 123
 train_or_test = args.train_or_test
 m = 'pairwise11'
 train_year = 3
+max_depth = args.max_depth
+n_estimators = args.n_estimators
 
 if train_year == 2:
     train_start = 20191206
@@ -108,8 +112,10 @@ model = xgb.XGBRanker(
     lambdarank_num_pair_per_sample=8,
     booster='gbtree',
     eval_metric=metric,
-    objective='rank:pairwise',
+    objective=obj,
     learning_rate=learning_rate,
+    max_depth=max_depth,
+    n_estimators=n_estimators,
     lambdarank_pair_method="topk"
 )
 
@@ -178,7 +184,7 @@ for group_size in test_groups:
 temp = yuan_test_df[['qid_date', 'stock_code', 'real_return', 'close', 'pclose']]
 
 temp.loc[:, "prediction"] = copy.deepcopy(predictions)
-# temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}.csv')
+# temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{metric}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv',index=False)
 
 #
 if train_or_test == 'test':

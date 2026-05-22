@@ -419,24 +419,27 @@ code/data/
 在当前复现包中，这些中间文件已经提供。为避免用户在复现过程中重复运行脚本并覆盖已提供的标准中间文件，`T4M10.py` 和 `T4C10.py` 中的保存语句默认处于注释状态。若用户希望从原始整理数据重新生成这些文件，需要先取消如下语句的注释：
 
 ```python
-temp.to_csv(f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}.csv')
+temp.to_csv(
+    f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{metric}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv',
+    index=False
+)
 ```
 
-随后在 `code/` 目录下运行相应命令。`train_or_test`、`shouxufei`、`yinhaushui` 和 `learning_rate` 可通过命令行输入；其中 `train_or_test=train` 生成训练期文件，`train_or_test=test` 生成样本外测试期文件。
+随后在 `code/` 目录下运行相应命令。`train_or_test`、`shouxufei`、`yinhaushui`、`learning_rate`、`max_depth` 和 `n_estimators` 可通过命令行输入；其中 `train_or_test=train` 生成训练期文件，`train_or_test=test` 生成样本外测试期文件。
 
 | 目标文件 | 生成命令 |
 |---|---|
-| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2` |
-| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
-| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` |
+| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 5 --n_estimators 1000
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2` | --max_depth 5 --n_estimators 1000
+| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
+| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
 
-对于 `train_year=2` 或 `train_year=4` 的文件，需要在脚本中将 `train_year` 设置为对应值后再运行同类命令。对于文件名中最大树深度或估计器数量不同的文件，例如 `_4_1000`、`_6_1000`、`_5_800`、`_5_900`、`_5_1100` 和 `_5_1200`，需要在脚本中调整对应的 LambdaMART 参数后生成。
+对于 `train_year=2` 或 `train_year=4` 的文件，需要在脚本中将 `train_year` 设置为对应值后再运行同类命令。对于文件名中最大树深度或估计器数量不同的文件，例如 `_4_1000`、`_6_1000`、`_5_800`、`_5_900`、`_5_1100` 和 `_5_1200`，可通过命令行指定相应的 `--max_depth` 和 `--n_estimators` 后生成。
 
 
 ### 8.7 重新训练 DQN 模型
