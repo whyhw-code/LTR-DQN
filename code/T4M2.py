@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from dl_dqn2 import T4ExcelWriter
 
 col_name = ['stock_code',  'qid_date', 'real_return',
             'close', 'pclose']
@@ -65,6 +66,12 @@ for qid_date, group in df.groupby('qid_date'):
 
 # 将结果转换为DataFrame
 results_df = pd.DataFrame(daily_results)
+
+T4ExcelWriter(scale=1).write(
+    results_df,
+    dapan_code,
+    "Baseline portfolio"
+)
 
 # print(results_df)
 # results_df.to_csv(f'end/oc/all_report{dapan_code}return17_2311.csv', index=False)

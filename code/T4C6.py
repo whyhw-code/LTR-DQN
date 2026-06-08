@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression, Lasso, LassoCV, LogisticRegre
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.svm import SVC,SVR
 import xgboost as xgb
-
+from dl_dqn2 import T4ExcelWriter
 from sklearn.preprocessing import MinMaxScaler
 
 plt.style.use("fivethirtyeight")
@@ -188,6 +188,12 @@ ARR = (results_df.iloc[-1]['total_profit'] / initial_amount) ** (242 / trading_d
 results_df['cummax'] = results_df['total_profit'].cummax()
 results_df['drawdown'] = (results_df['total_profit'] - results_df['cummax']) / results_df['cummax']
 max_drawdown = results_df['drawdown'].min()
+
+T4ExcelWriter(scale=5).write(
+    results_df,
+    dapan_code,
+    "XGBoost_R"
+)
 
 # 卡尔玛比率
 calmar_ratio = ARR / abs(max_drawdown) if max_drawdown != 0 else np.nan

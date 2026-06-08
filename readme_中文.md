@@ -20,8 +20,8 @@ LTR-DQN-main/
 │   ├── data/                 # 复现脚本使用的数据文件
 │   ├── model/                # 强化学习模型文件
 │   ├── temp/                 # 复现脚本使用的中间文件
-│       ├── os/               # 复现脚本使用的中间值
-│       ├── seed_summary.csv  # 复现T6使用的种子
+│   │   ├── oc/batch123/      # LambdaMART、LTR-DQN 和图像复现使用的中间文件
+│   │   └── seed_summary.csv  # 复现 Table 6 使用的随机种子
 │   ├── dl_dqn2.py            # LTR-DQN 模型过程
 │   ├── DQN_train.py          # DQN 训练脚本
 │   ├── F3.py                 # 复现 Figure 3 的脚本
@@ -32,7 +32,7 @@ LTR-DQN-main/
 │   ├── T3C2.py
 │   ├── T3M1.py
 │   └── ...
-├── result/                   # 结果文件和汇总输出
+├── result/                   # 结果文件、汇总 Excel 和图像复现输入
 ├── readme.md                 # 本 README 文件
 └── requirements.txt          # Python 依赖文件
 ```
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 
 - `code/temp/seed_summary.csv` 记录了首次运行 Table 6 相关脚本时使用的随机种子。该文件是复现 Table 6 结果所必需的文件，因为当前 Table 6 相关脚本仍继续使用这些已记录的种子以保证复现性。
 - `code/temp/oc/batch123/` 包含 LambdaMART 排序阶段生成的中间 CSV 文件，以及模型评估和图像生成过程中使用的中间文件。
-- 文件名形如 `meiri_xuanze*.csv` 的文件记录了不同训练年份设置下每日选股数量。若文件名中未标注训练年份，则对应设置为 `train_year = 3`。
+- 文件名形如 `meiri_xuanze*.csv` 的文件记录了不同训练年份设置下每日选股数量。若文件名中未标注训练年份，则对应设置为 `train_year = 3`。其中，`meiri_xuanze.csv` 是在运行 `T4M12.py` 的 LTR-DQN 测试流程时记录得到的标准每日选股数量文件，后续 LTR-DQN 测试、Figure 6 以及相关附录图会读取该文件，以固定每日选股数量。该文件中，`60` 列对应主板市场，`3068` 列对应创业板市场。
 
 `code/temp/oc/batch123/` 中形如特定板块的 `temp_train` 或 `temp_test` CSV 文件，是由前序 LambdaMART 排序阶段生成的中间结果。具体而言，原始整理数据：
 
@@ -161,7 +161,13 @@ code/model/batch123/
 
 ### 5.3 `result/`
 
-`result/` 目录存放最终输出、汇总结果以及用于表格和图像复现的文件。例如，`result/batch123/基准+模型结果对比.xlsx` 用于复现收益曲线图。
+`result/` 目录存放最终输出、汇总结果以及用于表格和图像复现的文件。主要包括：
+
+- `result/batch123/F3F4.xlsx`：Figure 3 和 Figure 4 使用的超参数敏感性分析中间结果文件。
+- `result/batch123/基准+模型结果对比.xlsx`：Figure 5 和 Figure 6 使用的基准模型与 LTR-DQN 收益曲线汇总文件。该文件由 T4 系列脚本通过 `T4ExcelWriter()` 方法逐项写入生成。
+- `result/batch123/feature_importance_LTR-DQN_0060.csv` 和 `result/batch123/feature_importance_LTR-DQN_3068.csv`：Figure 7 中 LTR-DQN 特征重要性部分使用的文件。
+
+上述文件在当前复现包中已经提供。若用户只希望复现论文图像，通常不需要重新生成这些文件。
 
 ------
 
@@ -272,7 +278,25 @@ cd LTR-DQN-main/code
 python F3.py
 ```
 
-`F3.py` 用于复现 Figure 3 中的超参数敏感性分析图。`F3.py` 所需输入数据已随脚本一并包含在仓库中。运行该脚本时，请保持原始文件夹结构不变。
+`F3.py` 是 Figure 3 的正式复现入口。默认情况下，`F3.py` 直接读取：
+
+```text
+result/batch123/F3F4.xlsx
+```
+
+并绘制 Figure 3，不会重新运行敏感性分析，也不会覆盖已有 Excel 文件。若用户希望重新运行 Figure 3 对应的敏感性分析并将结果写回 `F3F4.xlsx`，可运行：
+
+```bash
+python F3.py --run-analysis --write-excel
+```
+
+若只希望重新计算但不写回 Excel，可运行：
+
+```bash
+python F3.py --run-analysis
+```
+
+旧版本中用于拆分 Figure 3 或 Figure 4 处理流程的 `F3aC.py`、`F3aM.py`、`F4C.py` 和 `F4M.py` 已不再作为复现入口使用，并已从当前复现包中删除。
 
 #### Figure 4
 
@@ -283,7 +307,23 @@ cd LTR-DQN-main/code
 python F4.py
 ```
 
-`F4.py` 用于复现 Figure 4 中的超参数敏感性分析图。`F4.py` 所需输入数据已随脚本一并包含在仓库中。运行该脚本时，请保持原始文件夹结构不变。
+`F4.py` 是 Figure 4 的正式复现入口。默认情况下，`F4.py` 直接读取：
+
+```text
+result/batch123/F3F4.xlsx
+```
+
+并绘制 Figure 4，不会重新运行敏感性分析，也不会覆盖已有 Excel 文件。若用户希望重新运行 Figure 4 对应的敏感性分析并将结果写回 `F3F4.xlsx`，可运行：
+
+```bash
+python F4.py --run-analysis --write-excel
+```
+
+若只希望重新计算但不写回 Excel，可运行：
+
+```bash
+python F4.py --run-analysis
+```
 
 #### Figure 5 和 Figure 6
 
@@ -293,6 +333,8 @@ Figure 5 和 Figure 6 可通过 `code/` 目录中的以下脚本复现：
 cd LTR-DQN-main/code
 python F5.py
 python F6.py
+python F7a.py
+python F7b.py
 ```
 
 `F5.py` 用于复现 Figure 5。它依赖以下汇总收益对比文件：
@@ -301,7 +343,7 @@ python F6.py
 result/batch123/基准+模型结果对比.xlsx
 ```
 
-该 Excel 文件包含基准方法和本文提出的 LTR-DQN 模型的收益曲线结果。
+该 Excel 文件包含市场指数、基准投资组合、传统机器学习模型、LTR 模型以及本文提出的 LTR-DQN 模型的收益曲线结果。该文件不是手工录入文件，而是由 T4 系列脚本通过 `T4ExcelWriter()` 方法逐项写入生成。每个 T4 脚本负责写入相应基准或模型结果。
 
 `F6.py` 用于复现 Figure 6。除使用：
 
@@ -315,9 +357,31 @@ result/batch123/基准+模型结果对比.xlsx
 code/temp/oc/batch123/meiri_xuanze.csv
 ```
 
-Excel 文件提供收益曲线数据，`meiri_xuanze.csv` 提供 LTR-DQN 下每日选股数量。
+Excel 文件提供收益曲线数据，`meiri_xuanze.csv` 提供 LTR-DQN 下每日选股数量。`meiri_xuanze.csv` 是在运行 `T4M12.py` 的 LTR-DQN 测试流程时记录得到的文件，后续图像脚本读取该文件以固定每日选股数量。
+
+`F6.py` 已更新，使得在图像保存语句被注释或关闭时，`plot_fig6()` 中的 `output_name` 参数不会导致运行错误。
 
 上述路径均为相对于仓库根目录的路径。`code/` 与 `result/` 在 `LTR-DQN-main/` 下处于同一级目录。由于脚本从 `code/` 目录运行，代码中读取根目录 `result/` 下文件时，应使用类似 `../result/...` 的相对路径。
+
+#### Figure 7
+
+Figure 7 可通过 `F7a.py` 和 `F7b.py` 复现。Figure 7 使用特征重要性结果文件，其中 LTR-DQN 的特征重要性文件可由 `T4M11.py` 或 `T4C11.py` 中的特征重要性代码块生成。默认情况下，该代码块为避免覆盖已有文件而处于注释状态。若需重新生成 LTR-DQN 的特征重要性文件，可取消如下代码块的注释：
+
+```python
+varimp = pd.DataFrame()
+varimp["Features"] = X_train.drop(["qid_date"], axis=1).columns
+varimp["VarImp"] = ranker.feature_importances_
+varimp["LTR-DQN"] = (
+    varimp["VarImp"] - varimp["VarImp"].min()
+) / (
+    varimp["VarImp"].max() - varimp["VarImp"].min()
+)
+varimp.to_csv(
+    f"../result/batch{test_batch}/feature_importance_LTR-DQN_{dapan_code}.csv"
+)
+```
+
+其他模型的特征重要性结果由 Figure 7 对应的特征重要性生成脚本分别生成。
 
 ------
 
@@ -429,17 +493,31 @@ temp.to_csv(
 
 | 目标文件 | 生成命令 |
 |---|---|
-| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 5 --n_estimators 1000
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2` | --max_depth 5 --n_estimators 1000
-| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
-| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1` | --max_depth 6 --n_estimators 1000
+| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 5 --n_estimators 1000` |
+| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2 --max_depth 5 --n_estimators 1000` |
+| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 6 --n_estimators 1000` |
+| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 6 --n_estimators 1000` |
 
 对于 `train_year=2` 或 `train_year=4` 的文件，需要在脚本中将 `train_year` 设置为对应值后再运行同类命令。对于文件名中最大树深度或估计器数量不同的文件，例如 `_4_1000`、`_6_1000`、`_5_800`、`_5_900`、`_5_1100` 和 `_5_1200`，可通过命令行指定相应的 `--max_depth` 和 `--n_estimators` 后生成。
+
+#### 8.6.1 参数说明
+
+| 参数 | 含义 |
+|---|---|
+| `--bankuaicode` | 市场代码；`0060` 表示主板，`3068` 表示创业板。 |
+| `--train_year` | 训练窗口长度，主要取值为 `2`、`3` 或 `4`。 |
+| `--lr` | DQN 学习率，默认主要结果使用 `0.002`。 |
+| `--train_or_test` | LambdaMART 中间文件生成阶段；`train` 表示训练期，`test` 表示样本外测试期。 |
+| `--shouxufei` | 手续费参数，会进入中间文件名并参与收益计算。 |
+| `--yinhaushui` | 印花税参数，会进入中间文件名并参与收益计算。 |
+| `--learning_rate` | LambdaMART / XGBRanker 学习率，会影响排序得分。 |
+| `--max_depth` | LambdaMART / XGBRanker 最大树深度，会进入中间文件名并影响排序模型。 |
+| `--n_estimators` | LambdaMART / XGBRanker 估计器数量或树数量，会进入中间文件名并影响排序模型。 |
 
 
 ### 8.7 重新训练 DQN 模型
@@ -539,7 +617,39 @@ cd LTR-DQN-main/code
 
 重新训练后，用户可以运行相应的 `T*.py` 脚本来复现表格结果.
 
-### 8.8 复现表格结果
+### 8.8 关键汇总文件的生成和复用
+
+#### 8.8.1 `F3F4.xlsx`
+
+`result/batch123/F3F4.xlsx` 是 Figure 3 和 Figure 4 使用的超参数敏感性分析中间结果表。当前版本中，`F3.py` 和 `F4.py` 默认直接读取该文件并画图，不重新运行敏感性分析，也不写回 Excel。
+
+默认画图命令为：
+
+```bash
+python F3.py
+python F4.py
+```
+
+若需要重新运行敏感性分析并写回 `F3F4.xlsx`，可运行：
+
+```bash
+python F3.py --run-analysis --write-excel
+python F4.py --run-analysis --write-excel
+```
+
+#### 8.8.2 `基准+模型结果对比.xlsx`
+
+`result/batch123/基准+模型结果对比.xlsx` 是 Figure 5 和 Figure 6 使用的收益曲线汇总文件。该文件由 T4 系列脚本通过 `T4ExcelWriter()` 方法逐项写入生成。每个 T4 脚本负责写入相应的市场指数、基准投资组合、传统机器学习模型、LTR 模型或 LTR-DQN 结果。`F5.py` 和 `F6.py` 读取该 Excel 文件绘制收益曲线和每日选股数量图。
+
+#### 8.8.3 `meiri_xuanze.csv`
+
+`code/temp/oc/batch123/meiri_xuanze.csv` 是 LTR-DQN 每日选股数量文件。该文件是在运行 `T4M12.py` 的 LTR-DQN 测试流程时记录得到的，后续测试和图像复现脚本会读取该文件，以固定每日选股数量。文件中 `60` 列对应主板市场，`3068` 列对应创业板市场。
+
+#### 8.8.4 特征重要性文件
+
+`result/batch123/feature_importance_LTR-DQN_0060.csv` 和 `result/batch123/feature_importance_LTR-DQN_3068.csv` 可由 `T4M11.py` 或 `T4C11.py` 中的特征重要性代码块生成。默认情况下，该写入代码块被注释，以避免覆盖复现包中已经提供的结果。若需要重新生成，可取消相应代码块的注释后运行脚本。其他模型的特征重要性结果由 Figure 7 对应的特征重要性生成脚本分别生成。
+
+### 8.9 复现表格结果
 
 首先进入 `code/` 目录，然后按需运行对应脚本。例如：
 
@@ -563,9 +673,9 @@ python T6M5_2.py
 
 关于 Table 7：Table 7 的前三行，即市场指数、基准投资组合和不含 ESG 的 LTR-DQN，与 Table 4 中报告的基准/参考结果相同。额外的 Table 7 脚本用于生成 ESG 相关行，包括 Negative Screening 和 Positive Investing 结果。
 
-### 8.9 复现图像结果
+### 8.10 复现图像结果
 
-Figure 3 至 Figure 6 可在 `code/` 目录下复现：
+Figure 3 至 Figure 7 可在 `code/` 目录下复现：
 
 ```bash
 cd LTR-DQN-main/code
@@ -577,7 +687,7 @@ python F6.py
 
 运行这些脚本前，请确保第 7.3 节中说明的依赖文件均可用。
 
-### 8.10 随机性与复现说明
+### 8.11 随机性与复现说明
 
 DQN 训练过程包含随机成分，例如随机初始化、epsilon-greedy 探索和采样。
 
@@ -591,7 +701,12 @@ code/temp/seed_summary.csv
 
 对于论文表格结果的直接复现，建议用户使用仓库中提供的已训练模型文件、已记录随机种子和中间输出。如果用户选择重新训练 DQN 模型，而不是使用已提供文件，则可能由于随机训练过程以及硬件或底层库实现差异而产生数值差异。
 
-### 8.11 注意事项
+
+#### 8.11.1 结果更新说明
+
+当前版本已将部分市场指数和基准投资组合结果与 Python 复现脚本输出进行同步。相关修正主要影响 Table 3 中的市场指数和基准投资组合行，以及 Table 4 中创业板市场指数行。这些修正仅涉及 benchmark/reference 结果，不改变 LTR-DQN 相对于传统回归、分类和独立 LTR 模型的相对表现，也不改变论文主要结论。
+
+### 8.12 注意事项
 
 - 表格生成、图像生成和模型训练脚本均应在 `code/` 目录下运行。
 - 请保持原始仓库结构不变，尤其是 `code/data/`、`code/model/`、`code/temp/` 和 `result/`。

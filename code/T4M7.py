@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression, Lasso, LassoCV, LogisticRegre
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.svm import SVC,SVR
 import xgboost as xgb
-
+from dl_dqn2 import T4ExcelWriter
 
 from sklearn import metrics
 from sklearn.model_selection import KFold, GridSearchCV
@@ -174,6 +174,12 @@ for qid_date, group in df.groupby('qid_date'):
 
 # 将结果转换为DataFrame
 results_df = pd.DataFrame(daily_results)
+
+T4ExcelWriter(scale=5).write(
+    results_df,
+    dapan_code,
+    "SVM_C"
+)
 
 # print(results_df)
 # results_df.to_csv(

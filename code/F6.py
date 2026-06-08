@@ -97,12 +97,12 @@ plot_fig6(
     main_df,
     market_col="CSI 300 Index",
     title="(a) Main board market",
-    # output_name="fig6_main_board.png"
+    output_name="fig6_main_board.png"
 )
 
 plot_fig6(
     chinext_df,
     market_col="ChiNext Index",
     title="(b) ChiNext market",
-    # output_name="fig6_chinext.png"
+    output_name="fig6_chinext.png"
 )

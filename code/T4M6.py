@@ -7,6 +7,7 @@ from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.svm import SVC,SVR
 import xgboost as xgb
 from sklearn.preprocessing import MinMaxScaler
+from dl_dqn2 import T4ExcelWriter
 
 plt.style.use("fivethirtyeight")
 
@@ -170,6 +171,12 @@ for qid_date, group in df.groupby('qid_date'):
 
 # 将结果转换为DataFrame
 results_df = pd.DataFrame(daily_results)
+
+T4ExcelWriter(scale=5).write(
+    results_df,
+    dapan_code,
+    "XGBoost_R"
+)
 
 # print(results_df)
 # results_df.to_csv(

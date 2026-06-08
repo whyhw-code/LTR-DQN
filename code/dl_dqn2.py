@@ -4,6 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
 
 class Environment():
     def __init__(self, data, temp_data, start_date, end_date):
@@ -261,3 +264,173 @@ class Agent():
             else self.eps_min
         self.learn_step_counter += 1
         return loss.item()
+
+class T4ExcelWriter:
+    """
+    将 T4 结果写入 ../result/batch123/基准+模型结果对比.xlsx
+
+    当前逻辑：
+    - 不修改原始 results_df
+    - 不修改回测过程
+    - 只在写入 Excel 时，将资金结果同比缩小 5 倍
+    - 保留 Excel 原有格式，只改对应单元格的值
+    """
+
+    def __init__(self, excel_path=None, scale=5):
+        if excel_path is None:
+            self.excel_path = (
+                Path(__file__).resolve().parents[1]
+                / "result"
+                / "batch123"
+                / "基准+模型结果对比.xlsx"
+            )
+        else:
+            self.excel_path = Path(excel_path)
+
+        self.scale = scale
+
+        self.sheet_map = {
+            "0060": "主板",
+            "3068": "创业板",
+        }
+
+    def _to_int_date(self, value):
+        if pd.isna(value):
+            return None
+
+        if hasattr(value, "strftime"):
+            return int(value.strftime("%Y%m%d"))
+
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                return None
+
+            # 关键：用 pandas 正确解析 2021/12/7 这种非补零日期
+            parsed_date = pd.to_datetime(value)
+            return int(parsed_date.strftime("%Y%m%d"))
+
+        return int(float(value))
+
+    def _get_col_index(self, ws, header_name):
+        for cell in ws[1]:
+            if cell.value == header_name:
+                return cell.column
+
+        raise ValueError(
+            f"Cannot find column '{header_name}' in sheet '{ws.title}'."
+        )
+
+    def write(
+            self,
+            results_df,
+            dapan_code,
+            target_col,
+            value_col=None,
+            date_col="qid_date",
+            count_col=None,
+            count_target_col="number of stocks",
+            initial_date=20211206,
+            start_date=20211207,
+            initial_value=1_000_000,
+    ):
+        if dapan_code not in self.sheet_map:
+            raise ValueError(f"Unsupported dapan_code: {dapan_code}")
+
+        if not self.excel_path.exists():
+            raise FileNotFoundError(f"Excel file not found: {self.excel_path}")
+
+        if value_col is None:
+            if "total_profit" in results_df.columns:
+                value_col = "total_profit"
+            elif "funds" in results_df.columns:
+                value_col = "funds"
+            else:
+                raise ValueError(
+                    "Cannot infer value_col. Expected 'total_profit' or 'funds'."
+                )
+
+        if date_col not in results_df.columns:
+            raise ValueError(f"results_df does not contain date column: {date_col}")
+
+        if value_col not in results_df.columns:
+            raise ValueError(f"results_df does not contain value column: {value_col}")
+
+        write_df = results_df.copy()
+
+        write_df["_qid_date_key"] = write_df[date_col].map(self._to_int_date)
+        write_df = write_df.dropna(subset=["_qid_date_key"])
+        write_df["_qid_date_key"] = write_df["_qid_date_key"].astype(int)
+
+        # 核心：只在写入 Excel 时同比缩小 5 倍
+        values = write_df[value_col].astype(float) / self.scale
+        write_df = write_df[write_df["_qid_date_key"] >= start_date]
+        value_map = dict(zip(write_df["_qid_date_key"], values))
+
+        count_map = None
+        if count_col is not None:
+            if count_col not in write_df.columns:
+                raise ValueError(
+                    f"results_df does not contain count column: {count_col}"
+                )
+
+            count_map = dict(
+                zip(
+                    write_df["_qid_date_key"],
+                    write_df[count_col].astype(int)
+                )
+            )
+
+        wb = load_workbook(self.excel_path)
+
+        sheet_name = self.sheet_map[dapan_code]
+        if sheet_name not in wb.sheetnames:
+            raise ValueError(f"Sheet '{sheet_name}' not found in {self.excel_path}")
+
+        ws = wb[sheet_name]
+
+        excel_date_col = self._get_col_index(ws, "qid_date")
+        target_col_idx = self._get_col_index(ws, target_col)
+
+        count_target_col_idx = None
+        if count_map is not None:
+            count_target_col_idx = self._get_col_index(ws, count_target_col)
+
+        updated = 0
+        updated_count = 0
+
+        for row in range(2, ws.max_row + 1):
+            qid_date = self._to_int_date(
+                ws.cell(row=row, column=excel_date_col).value
+            )
+
+            if qid_date == initial_date:
+                ws.cell(row=row, column=target_col_idx).value = initial_value
+                updated += 1
+
+            elif qid_date in value_map:
+                ws.cell(row=row, column=target_col_idx).value = float(value_map[qid_date])
+                updated += 1
+
+            if count_map is not None:
+                if qid_date == initial_date:
+                    ws.cell(row=row, column=count_target_col_idx).value = 0
+                    updated_count += 1
+
+                elif qid_date in count_map:
+                    ws.cell(row=row, column=count_target_col_idx).value = int(count_map[qid_date])
+                    updated_count += 1
+                updated_count += 1
+
+        wb.save(self.excel_path)
+
+        print(
+            f"[T4ExcelWriter] Updated {updated} rows: "
+            f"sheet={sheet_name}, column={target_col}, scale=1/{self.scale}"
+        )
+
+        if count_map is not None:
+            print(
+                f"[T4ExcelWriter] Updated {updated_count} rows: "
+                f"sheet={sheet_name}, column={count_target_col}"
+            )

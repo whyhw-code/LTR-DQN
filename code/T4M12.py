@@ -1,8 +1,17 @@
 import torch as T
 import pandas as pd
 import numpy as np
-from dl_dqn2 import Environment,DeepQNetwork ,Agent
+from dl_dqn2 import Environment, DeepQNetwork, Agent, T4ExcelWriter
 import random
+from dl_dqn2 import T4ExcelWriter
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--lr', type=float, default=0.002)
+parser.add_argument('--train_year', type=int, default=3)
+parser.add_argument('--test_batch', type=int, default=123)
+parser.add_argument('--write_excel', action='store_true')
+args = parser.parse_args()
 
 if __name__ == '__main__':
     bankuaicode = '0060'
@@ -11,9 +20,9 @@ if __name__ == '__main__':
     np.random.seed(seed)
     T.manual_seed(seed)
     LTR = 'ndcg'
-    train_year = 3
-    test_batch = 123
-    lr = 0.002
+    train_year = args.train_year
+    test_batch = args.test_batch
+    lr = args.lr
     test_start = 20211207
     data = pd.read_csv(f'data/dapan/{bankuaicode}merge.csv',
                        usecols=['trade_date', 'qid_date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'pct_chg', 'group_len'])
@@ -89,6 +98,16 @@ if __name__ == '__main__':
     #result_df.to_excel(f'result/batch{test_batch}/{bankuaicode}_{LTR}_{train_year}year_train{train_year}_top4TESToc_{lr}xinxin.xlsx', index=False)
 
     results_df = result_df[test_start <= result_df['qid_date']]
+
+    T4ExcelWriter(scale=500).write(
+        results_df,
+        dapan_code=bankuaicode,
+        target_col="LTR-DQN",
+        value_col="funds",
+        count_col="real_action",
+        count_target_col="number of stocks"
+
+    )
 
     # 初始金额
     initial_amount = results_df.iloc[0]['funds']

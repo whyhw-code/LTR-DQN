@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import copy
 import xgboost as xgb
-
+from dl_dqn2 import T4ExcelWriter
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -36,8 +36,11 @@ parser.add_argument('--train_or_test', type=str, default='test', choices=['train
 parser.add_argument('--shouxufei', type=float, default=0.0003)
 parser.add_argument('--yinhaushui', type=float, default=0.001)
 parser.add_argument('--learning_rate', type=float, default=0.1)
-parser.add_argument('--max_depth', type=int, default=6)
-parser.add_argument('--n_estimators', type=int, default=1000)
+parser.add_argument('--max_depth', type=int, default=None)
+parser.add_argument('--n_estimators', type=int, default=None)
+
+# 是否写入 Excel
+parser.add_argument('--write_excel', action='store_true')
 
 args = parser.parse_args()
 
@@ -105,17 +108,23 @@ Y_train = train_df[Ycol_name]
 X_test = test_df[Xcol_name]
 Y_test = test_df[Ycol_name]
 
-model = xgb.XGBRanker(
-    tree_method='gpu_hist',
-    lambdarank_num_pair_per_sample=8,
-    booster='gbtree',
-    eval_metric=metric,
-    objective=obj,
-    learning_rate=learning_rate,
-    max_depth=max_depth,
-    n_estimators=n_estimators,
-    lambdarank_pair_method="topk"
-)
+model_params = {
+    "tree_method": "gpu_hist",
+    "lambdarank_num_pair_per_sample": 8,
+    "booster": "gbtree",
+    "eval_metric": metric,
+    "objective": obj,
+    "learning_rate": learning_rate,
+    "lambdarank_pair_method": "topk",
+}
+
+if max_depth is not None:
+    model_params["max_depth"] = max_depth
+
+if n_estimators is not None:
+    model_params["n_estimators"] = n_estimators
+
+model = xgb.XGBRanker(**model_params)
 
 x_train = X_train.drop(['qid_date'], axis=1)
 y_train = Y_train.to_numpy()
@@ -237,6 +246,13 @@ if train_or_test == 'test':
 
     # 将结果转换为DataFrame
     results_df = pd.DataFrame(daily_results)
+
+    # 写入
+    # T4ExcelWriter(scale=5).write(
+    #     results_df,
+    #     dapan_code,
+    #     "LambdaRank"
+    # )
 
     # print(results_df)
     #results_df.to_csv(f'end/oc/batch{test_batch}/{dapan_code}return_{train_or_test}_{m}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}.csv', index=False)

@@ -1,11 +1,19 @@
 import numpy as np
 import pandas as pd
+from dl_dqn2 import T4ExcelWriter
 
 col_name = ['trade_date',  'pct_chg', 'total_profit']
 
 dapan_code = '3068'
 
 results_df = pd.read_csv(f'data/{dapan_code}merge_T4.csv', usecols=col_name)
+
+T4ExcelWriter(scale=1).write(
+    results_df,
+    dapan_code,
+    "ChiNext Index",
+    date_col="trade_date"
+)
 
 initial_amount = 1000000
 daily_results = []

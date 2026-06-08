@@ -5,10 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression, Lasso, LassoCV, LogisticRegression
 import xgboost as xgb
-
-
-from sklearn import metrics
-from sklearn.model_selection import KFold, GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 
 plt.style.use("fivethirtyeight")
@@ -43,7 +39,7 @@ Xcol_name = ['page', 'advance_reaction', 'star_analyst', 'title_len', 'num_sente
 # Ycol_name = ['up_down']
 
 Reg_or_Class = 'xgbreg'
-dapan_code = '3068'
+dapan_code = '0060'
 test_batch = 123
 train_or_test = 'test'
 train_year = 3
@@ -91,7 +87,7 @@ lasso_model.fit(data_Xtransformed, data_y3transformed.ravel())
 lasso_coef = np.abs(lasso_model.coef_)
 
 # --- 4. 读取现有的 LTR-DQN 结果 ---
-ltr_file = '../result/batch123/feature_importance_LTR-DQN_3068.csv'
+ltr_file = '../result/batch123/feature_importance_LTR-DQN_0060.csv'
 
 df_ltr = pd.read_csv(ltr_file)
 df_ltr = df_ltr[['Features', 'LTR-DQN']].sort_values('Features').reset_index(drop=True)
