@@ -151,6 +151,7 @@ def check_script_exists(script_name):
 def parse_arr_from_output(output):
     patterns = [
         r"年化收益率\s*\(ARR\)\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
+        r"\(\s*ARR\s*\)\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
         r"ARR\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
     ]
 
@@ -492,7 +493,10 @@ if __name__ == "__main__":
         f4c_df = run_f4c_max_depth_sensitivity(args)
 
         if args.write_excel:
-            write_f4_results_to_excel(f4a_df, f4b_df, f4c_df, file_path)
+            # 保留 --write-excel 开关，但无论是否传入该参数，都不执行 Excel 写入。
+            # 如需恢复写入，只需取消下一行注释并删除 pass。
+            # write_f4_results_to_excel(f4a_df, f4b_df, f4c_df, file_path)
+            pass
 
     if args.plot_figure:
         result_dir = get_result_dir(args.test_batch)

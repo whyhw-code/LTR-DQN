@@ -148,6 +148,7 @@ def check_script_exists(script_name):
 def parse_arr_from_output(output):
     patterns = [
         r"年化收益率\s*\(ARR\)\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
+        r"\(\s*ARR\s*\)\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
         r"ARR\s*[:：]\s*([-+]?\d+(?:\.\d+)?)",
     ]
 
