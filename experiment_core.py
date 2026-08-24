@@ -193,7 +193,7 @@ def validate_runtime() -> None:
         )
         raise RuntimeError(
             f"The locked reproduction environment is required: {details}. "
-            "Install requirements-lock.txt with Python 3.9.13 and the PyTorch CPU wheel."
+            "Install requirements.txt with Python 3.9.13 and the PyTorch CPU wheel."
         )
 
 
