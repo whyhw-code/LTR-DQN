@@ -1,4 +1,19 @@
-_pycache_/
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
 .idea/
+.vscode/
+.venv/
+.conda/
+
+# Generated experiment artifacts
+model/
+results/
+runs/
+temp/
+*.log
+
+# Local environment files
+.env
+.env.*
+!.env.example

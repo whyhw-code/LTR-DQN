@@ -1,747 +1,152 @@
-# Replication Package README (English Revised Version)
+# LTR-DQN Reproduction Package
 
-## 1. Basic Information
+This repository reproduces the empirical results for *Enhancing Predictive
+Selection of Sell-Side Analyst Reports via Learning to Rank and Reinforcement
+Learning* from fixed prepared input data. Fresh rankings, DQN checkpoints,
+tables, and empirical figures are generated during each run; generated
+artifacts are not stored in Git.
 
-- **Paper title**: Enhancing Predictive Selection of Sell-Side Analyst Reports via Learning to Rank and Reinforcement Learning
-- **Manuscript number**: IJF-D-24-00575R3
-- **Authors**: Jiaming Liu, Hongyang Wang, Yongli Li, Kaiwei Jia
-- **Corresponding author email**: liyongli@hit.edu.cn
-- **Package date**: 2026.04.13
+Figures 1 and 2 are schematic diagrams and are outside the numerical
+reproduction workflow.
 
-------
+## One-click reproduction on GitHub
 
-## 2. Repository Structure
+No local Python environment is required.
 
-The repository structure is as follows:
+1. Open the repository's **Actions** tab.
+2. Select **Reproduce Core** or **Reproduce T6**.
+3. Click **Run workflow**.
+4. When the workflow finishes, download its artifact from the workflow summary.
 
-```text
-LTR-DQN-main/
-├── code/
-│   ├── data/                 # Data files used by the reproduction scripts
-│   ├── model/                # Reinforcement-learning model files
-│   ├── temp/                 # Intermediate files used by the reproduction scripts
-│   │   ├── oc/batch123/      # Intermediate files used by LambdaMART, LTR-DQN, and figure reproduction
-│   │   └── seed_summary.csv  # Random seeds used for reproducing Table 6
-│   ├── dl_dqn2.py            # LTR-DQN model process
-│   ├── DQN_train.py          # DQN training script
-│   ├── F3.py                 # Script for reproducing Figure 3
-│   ├── F4.py                 # Script for reproducing Figure 4
-│   ├── F5.py                 # Script for reproducing Figure 5
-│   ├── F6.py                 # Script for reproducing Figure 6
-│   ├── T3C1.py               # Example table reproduction script
-│   ├── T3C2.py
-│   ├── T3M1.py
-│   └── ...
-├── result/                   # Result files, summary Excel files, and figure reproduction inputs
-├── readme.md                 # This README file
-└── requirements.txt          # Python dependency file
-```
+### Reproduce Core
 
-Most executable scripts, including `T*.py`, `F3.py`, `F4.py`, `F5.py`, `F6.py`, and `DQN_train.py`, are located under the `code/` directory. Therefore, all table-generation, figure-generation, and model-training scripts should be run after entering the `code/` directory.
+The Core workflow trains fresh models and produces:
 
-------
+- Tables 3, 4, 5, and 7;
+- main-text Figures 3-7;
+- Appendix Figures C1, C2, C3, and C5;
+- manifests containing runtime versions and hashes of generated inputs and
+  outputs.
 
-## 3. Computational Environment
+The downloadable artifact is named `ltr-dqn-core-<run-id>`.
 
-### 3.1 Software Requirements
+### Reproduce T6
 
-This replication package has been tested under the following software versions:
+Table 6 is substantially more expensive than the Core workflow. The T6
+workflow trains the required three-year models, partitions the fixed seed
+ledger into ten deterministic cloud jobs, merges their outputs, checks that
+every market/rate/model cell contains exactly 500 results, and produces:
 
-- Python: 3.9.16
-- PyTorch: 2.0.0
-- XGBoost: 1.7.6
+- Table 6 and its complete selected-result audit trail;
+- Appendix Figure C4;
+- a manifest containing hashes for every shard and merged output.
 
-GPU execution is recommended for model training. However, if the provided intermediate results and pretrained outputs are used, the table-generation scripts can be run directly.
+The downloadable artifact is named `ltr-dqn-t6-<run-id>`.
 
-### 3.2 Installing Dependencies
-
-This package provides a dependency file: `requirements.txt`.
-
-Please create a clean Python 3.9 environment in the project root directory and install the dependencies as follows:
-
-```bash
-cd LTR-DQN-main
-conda create -n ltr-dqn python=3.9.16
-conda activate ltr-dqn
-pip install -r requirements.txt
-```
-
-The required Python packages are listed in `requirements.txt`.
-
-------
-
-## 4. Data Description
-
-### 4.1 Data Source
-
-The data used in this study come from sell-side analyst reports.
-
-### 4.2 Data Availability
-
-The original analyst reports can be downloaded from Eastmoney.
-
-### 4.3 Data Files and Format
-
-The original data consist of sell-side analyst report files in PDF format. The data files directly used by the reproduction scripts have already been placed in the corresponding data directories in the repository.
-
-------
-
-## 5. Repository Contents and Intermediate Files
-
-This repository contains model-training scripts, data used by the code, intermediate files generated during the experiments, and scripts for reproducing the tables and figures reported in the paper.
-
-### 5.1 `code/`
-
-The `code/` directory contains the main executable scripts and the files used by those scripts, including:
-
-- model-training code;
-- table reproduction scripts;
-- figure reproduction scripts;
-- data files directly used by the code;
-- intermediate files generated during the experiments.
-
-### 5.2 `code/temp/`
-
-The `code/temp/` directory stores intermediate files used by the reproduction scripts.
-
-Specifically:
-
-- `code/temp/seed_summary.csv` records the random seeds used when the Table 6 related scripts were first run. This file is necessary for reproducing Table 6, because the current Table 6 scripts continue to use the recorded seeds to ensure reproducibility.
-- `code/temp/oc/batch123/` contains intermediate CSV files generated by the LambdaMART ranking stage, as well as intermediate files used during model evaluation and figure generation.
-- Files named `meiri_xuanze*.csv` record the daily number of selected stocks under different training-year settings. If the filename does not specify a training year, it corresponds to `train_year = 3`. In particular, `meiri_xuanze.csv` is the standard daily stock-selection-count file recorded during the LTR-DQN testing procedure in `T4M12.py`. Downstream LTR-DQN testing scripts, Figure 6, and related appendix figures read this file to keep the daily number of selected stocks fixed. In this file, column `60` corresponds to the Main Board market, and column `3068` corresponds to the ChiNext market.
-
-The `temp_train` and `temp_test` CSV files under `code/temp/oc/batch123/` are intermediate results generated by the preceding LambdaMART ranking stage. Specifically, the prepared input data:
+## Repository layout
 
 ```text
-code/data/0060merge_open_close_final.csv
-code/data/3068merge_open_close_final.csv
+.
+|-- .github/workflows/
+|   |-- reproduce-core.yml
+|   `-- reproduce-t6.yml
+|-- data/
+|   |-- dapan/                 # prepared market-index inputs
+|   |-- ESG/                   # prepared ESG evaluation inputs
+|   `-- reproducibility/       # fixed T6 seed ledgers
+|-- train.py                   # fresh LambdaRank/LambdaMART/DQN training
+|-- main.py                    # T3/T4/T5/T7 and non-T6 figures
+|-- T6_main.py                 # T6 shard merge, table, and Figure C4
+|-- t6_shard_runner.py         # cloud-only deterministic T6 partition runner
+|-- model.py                   # original model entry point
+|-- workflow.py                # table evaluation implementation
+|-- Fig_main.py                # main-text empirical figures
+|-- Appendix_Fig_main.py       # appendix empirical figures
+|-- requirements-lock.txt      # fully pinned Python environment
+`-- .gitignore                 # excludes every generated artifact
 ```
 
-are processed by `T4M10.py` and `T4C10.py`, respectively. `T4M10.py` corresponds to the Main Board market (`0060`), and `T4C10.py` corresponds to the ChiNext market (`3068`). Running these two scripts with different parameter settings generates the `temp_train` and `temp_test` CSV files under `code/temp/oc/batch123/`.
+The repository contains prepared model inputs, not the original analyst-report
+PDF collection. Training never modifies files under `data/`.
 
-Specifically:
+The two files under `data/reproducibility/` are fixed experimental
+configuration:
 
-- `temp_train` files contain LambdaMART ranking results for the training-period samples and are used for subsequent DQN training;
-- `temp_test` files contain LambdaMART ranking results for the out-of-sample testing-period samples and are used for subsequent DQN testing, return evaluation, and table reproduction.
+- `seed_summary.csv`: LambdaRank and LambdaMART sampling seeds;
+- `dqn_seed_summary.csv`: independent LTR-DQN sampling seeds.
 
-These CSV files usually contain the following fields:
+They are included because the paper does not report the full sampled seed
+sequence and Table 6 cannot be reproduced without that ledger.
+
+## Local reproduction (optional)
+
+GitHub Actions is the reference execution path. For a local run, use 64-bit
+Python 3.9.13 on Windows and install the CPU build of PyTorch before the locked
+requirements:
+
+```powershell
+python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-lock.txt
+```
+
+Core workflow:
+
+```powershell
+python train.py
+python main.py --export_csvs
+```
+
+T6 workflow without cloud sharding:
+
+```powershell
+python train.py --models all --years 3 --t6 --ranker_tree_method hist
+python T6_main.py
+```
+
+The T6 command requires the three-year rankings and DQN checkpoints produced by
+the Core training command. A complete single-machine T6 run can take many hours
+and resumes from `temp/t6_runs/t6_raw.csv` if interrupted.
+
+## Generated outputs
+
+Local runs write only to ignored directories:
 
 ```text
-qid_date, stock_code, real_return, prediction, close, pclose
+model/                       # fresh DQN checkpoints
+temp/rankings/               # fresh ranker outputs
+temp/actions/                # fresh DQN evaluation actions
+temp/t6_runs/                # per-seed T6 results
+results/combined/            # T3/T4/T5/T7 workbook and CSVs
+results/figures/             # main-text empirical figures
+results/appendix_figures/    # Appendix Figures C1-C5
+results/T6/                  # T6 workbook, CSVs, and manifest
 ```
 
-Here, `prediction` is the ranking score generated by the LambdaMART model for the daily candidate stocks, and `real_return`, `close`, and `pclose` are used for subsequent return calculation, DQN state construction, and policy evaluation.
-
-The filename records the parameter settings used to generate the file. For example:
-
-```text
-0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv
-```
-
-indicates that the file corresponds to the Main Board market `0060`, the testing-period sample, the `ndcg` ranking metric, a 3-year training window, transaction fee `0.0003`, stamp duty `0.001`, LambdaMART learning rate `0.001`, maximum tree depth `5`, and number of estimators `1000`.
-
-Another example is:
-
-```text
-3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv
-```
-
-which indicates that the file corresponds to the ChiNext market `3068`, the training-period sample, the `ndcg` ranking metric, a 3-year training window, transaction fee `0.0003`, stamp duty `0.001`, LambdaMART learning rate `0.1`, maximum tree depth `6`, and number of estimators `1000`.
-
-Subsequently, `DQN_train.py` reads the corresponding `temp_train` files under `code/temp/oc/batch123/` and trains the DQN portfolio selection model based on the LambdaMART ranking results. After training, the DQN model files are saved to:
-
-```text
-code/model/batch123/
-```
-
-Downstream testing and result reproduction scripts, such as `T4M12.py` and `T4C12.py`, use both the DQN model files under `code/model/batch123/` and the corresponding `temp_test` files under `code/temp/oc/batch123/` to generate the portfolio performance results reported in the paper. Other downstream table and figure reproduction scripts also rely on these intermediate results and model outputs.
-
-In the current release of the replication package, the above intermediate files are already provided. The corresponding save statements in `T4M10.py` and `T4C10.py` are commented out by default to prevent users from rerunning the scripts and overwriting the provided standard intermediate files during reproduction. If users wish to regenerate these intermediate files from the prepared input data, they can uncomment the corresponding `to_csv` save statements and rerun `T4M10.py` and `T4C10.py` with the same parameter settings.
-
-### 5.3 `result/`
-
-The `result/` directory stores final outputs, summary results, and files used for table and figure reproduction. The main files include:
-
-- `result/batch123/F3F4.xlsx`: the intermediate result file used for the hyperparameter sensitivity analyses in Figure 3 and Figure 4.
-- `result/batch123/基准+模型结果对比.xlsx`: the summary file of return curves for benchmark models and LTR-DQN, used for Figure 5 and Figure 6. This file is generated by the T4-series scripts through the `T4ExcelWriter()` method.
-- `result/batch123/feature_importance_LTR-DQN_0060.csv` and `result/batch123/feature_importance_LTR-DQN_3068.csv`: the LTR-DQN feature-importance files used in Figure 7.
-
-These files are already provided in the current replication package. If users only wish to reproduce the paper figures, they usually do not need to regenerate these files.
-
-------
-
-## 6. Code Description
-
-### 6.1 Main Scripts
-
-- `code/DQN_train.py`: DQN training script, used when retraining the model is required
-- `code/dl_dqn2.py`: LTR-DQN model process
-- `code/T*.py`: scripts for reproducing paper tables
-- `code/F3.py`: script for reproducing Figure 3
-- `code/F4.py`: script for reproducing Figure 4
-- `code/F5.py`: script for reproducing Figure 5
-- `code/F6.py`: script for reproducing Figure 6
-
-------
-
-## 7. Reproducing Tables and Figures
-
-### 7.1 Script Naming Rules
-
-Scripts used to generate the table results follow a unified naming rule.
-
-#### (1) Standard tables
-
-Naming format:
-
-```text
-T[table number][market][row number].py
-```
-
-- `T`: Table
-- table number: the corresponding table number in the paper, e.g., `T4` indicates Table 4
-- `C`: ChiNext market
-- `M`: Main Board market
-- row number: the corresponding row in the table
-
-Examples:
-
-- `T4C3.py` → Table 4, ChiNext market, row 3
-- `T5M12.py` → Table 5, Main Board market, row 12
-
-#### (2) Special naming rule for Table 6
-
-Naming format:
-
-```text
-T6[market][ratio]_[model].py
-```
-
-- `C`: ChiNext market
-- `M`: Main Board market
-
-Ratio mapping:
-
-- `5` = 50%
-- `6` = 60%
-- `7` = 70%
-- `8` = 80%
-- `9` = 90%
-
-Model identifier:
-
-- `_1`: LambdaRank
-- `_2`: LambdaMART + LTR-DQN
-
-Examples:
-
-- `T6C5_1.py` → Table 6, ChiNext market, 50%, LambdaRank
-- `T6M6_2.py` → Table 6, Main Board market, 60%, LambdaMART + LTR-DQN
-
-### 7.2 Correspondence Between Code and Results
-
-The correspondence between the tables in the paper and the scripts is as follows:
-
-- Table 3: generated by `T3*.py`
-- Table 4: generated by `T4*.py`
-- Table 5: generated by `T5*.py`
-- Table 6: generated by `T6*_*.py`
-- Table 7: generated by `T7*.py`
-
-Here:
-
-- `C` indicates the ChiNext market
-- `M` indicates the Main Board market
-
-Each script generates the result for a corresponding row or column of the table.
-
-### 7.3 Figure Reproduction
-
-The figures in the paper are generated in different ways depending on their purpose.
-
-#### Figure 1 and Figure 2
-
-Figure 1 and Figure 2 are schematic figures rather than figures generated from numerical outputs.
-
-- Figure 1 illustrates the LTR-DQN portfolio construction framework.
-- Figure 2 illustrates the DQN mechanism used in this study.
-
-These two figures were drawn manually using drawing software and do not depend on numerical outputs from Python scripts.
-
-#### Figure 3
-
-Figure 3 can be reproduced using the following script under the `code/` directory:
-
-```bash
-cd LTR-DQN-main/code
-python F3.py
-```
-
-`F3.py` is the official entry script for reproducing Figure 3. By default, `F3.py` directly reads:
-
-```text
-result/batch123/F3F4.xlsx
-```
-
-and plots Figure 3. It does not rerun the sensitivity analyses or overwrite the existing Excel file. If users wish to rerun the sensitivity analyses corresponding to Figure 3 and write the results back to `F3F4.xlsx`, run:
-
-```bash
-python F3.py --run-analysis --write-excel
-```
-
-If users only wish to recompute the results without writing them back to Excel, run:
-
-```bash
-python F3.py --run-analysis
-```
-
-The old split-processing scripts `F3aC.py`, `F3aM.py`, `F4C.py`, and `F4M.py`, which were used in earlier versions for processing Figure 3 or Figure 4, are no longer used as reproduction entry points and have been removed from the current replication package.
-
-#### Figure 4
-
-Figure 4 can be reproduced using the following script under the `code/` directory:
-
-```bash
-cd LTR-DQN-main/code
-python F4.py
-```
-
-`F4.py` is the official entry script for reproducing Figure 4. By default, `F4.py` directly reads:
-
-```text
-result/batch123/F3F4.xlsx
-```
-
-and plots Figure 4. It does not rerun the sensitivity analyses or overwrite the existing Excel file. If users wish to rerun the sensitivity analyses corresponding to Figure 4 and write the results back to `F3F4.xlsx`, run:
-
-```bash
-python F4.py --run-analysis --write-excel
-```
-
-If users only wish to recompute the results without writing them back to Excel, run:
-
-```bash
-python F4.py --run-analysis
-```
-
-#### Figure 5 and Figure 6
-
-Figure 5 and Figure 6 can be reproduced using the following scripts under the `code/` directory:
-
-```bash
-cd LTR-DQN-main/code
-python F5.py
-python F6.py
-```
-
-`F5.py` is used to reproduce Figure 5. It depends on the following summary return-comparison file:
-
-```text
-result/batch123/基准+模型结果对比.xlsx
-```
-
-This Excel file contains the return-curve results for market indices, baseline portfolios, traditional machine-learning models, LTR models, and the proposed LTR-DQN model. It is not a manually entered file; instead, it is generated by the T4-series scripts through the `T4ExcelWriter()` method. Each T4 script writes its corresponding benchmark or model result.
-
-`F6.py` is used to reproduce Figure 6. In addition to using:
-
-```text
-result/batch123/基准+模型结果对比.xlsx
-```
-
-it also depends on the daily stock-selection-count file:
-
-```text
-code/temp/oc/batch123/meiri_xuanze.csv
-```
-
-The Excel file provides the return-curve data, while `meiri_xuanze.csv` provides the daily number of selected stocks under LTR-DQN. `meiri_xuanze.csv` is recorded during the LTR-DQN testing procedure in `T4M12.py`. Downstream figure scripts read this file to keep the daily stock-selection counts fixed.
-
-`F6.py` has been updated so that the `output_name` argument in `plot_fig6()` does not cause a runtime error when the figure-saving statement is commented out or disabled.
-
-The paths above are relative to the repository root. The `code/` and `result/` directories are at the same level under `LTR-DQN-main/`. Because the scripts are run from the `code/` directory, paths that read files under the root-level `result/` directory should use relative paths such as `../result/...`.
-
-#### Figure 7
-
-Figure 7 can be reproduced using `F7a.py` and `F7b.py`. Figure 7 uses feature-importance result files. The LTR-DQN feature-importance files can be generated by the feature-importance code block in `T4M11.py` or `T4C11.py`. By default, this code block is commented out to avoid overwriting the already provided files. To regenerate the LTR-DQN feature-importance files, uncomment the following code block:
-
-```python
-varimp = pd.DataFrame()
-varimp["Features"] = X_train.drop(["qid_date"], axis=1).columns
-varimp["VarImp"] = ranker.feature_importances_
-varimp["LTR-DQN"] = (
-    varimp["VarImp"] - varimp["VarImp"].min()
-) / (
-    varimp["VarImp"].max() - varimp["VarImp"].min()
-)
-varimp.to_csv(
-    f"../result/batch{test_batch}/feature_importance_LTR-DQN_{dapan_code}.csv"
-)
-```
-
-The feature-importance results for the other models are generated by the corresponding feature-importance generation scripts used for Figure 7.
-
-------
-
-## 8. Reproduction Instructions
-
-### 8.1 Reproduction Workflow
-
-This replication package can be used in two ways.
-
-#### Path A: Reproduce the paper tables using the provided intermediate results and pretrained outputs
-
-This is the recommended path for reproducibility checks. This path **does not require retraining the DQN model**.
-
-1. Clone or download the repository.
-2. Create the Python environment using `requirements.txt` and install the dependencies.
-3. Enter the `code/` directory.
-4. Run the corresponding `T*.py` scripts to reproduce the paper tables.
-5. Compare the printed outputs with the results reported in the paper.
-
-Example:
-
-```bash
-cd LTR-DQN-main
-conda create -n ltr-dqn python=3.9.16
-conda activate ltr-dqn
-pip install -r requirements.txt
-
-cd code
-python T3M1.py
-python T3M2.py
-python T4M1.py
-```
-
-#### Path B: Retrain the DQN model and then reproduce the results
-
-This path is optional and is only needed when users wish to regenerate the DQN model instead of using the provided pretrained model files.
-
-1. Create the Python environment using `requirements.txt` and install the dependencies.
-2. Enter the `code/` directory.
-3. Run `DQN_train.py` with the desired command-line parameters.
-4. After retraining, run the corresponding `T*.py` scripts to reproduce the tables.
-
-Unless retraining the DQN model is specifically required, users are advised to use Path A.
-
-### 8.2 Environment Setup
-
-A clean conda environment with Python 3.9.16 is recommended:
-
-```bash
-cd LTR-DQN-main
-conda create -n ltr-dqn python=3.9.16
-conda activate ltr-dqn
-pip install -r requirements.txt
-```
-
-### 8.3 Working Directory
-
-All table-generation, figure-generation, and training scripts are located under the `code/` directory. Therefore, after installing the dependencies, please enter the `code/` directory before running any script:
-
-```bash
-cd LTR-DQN-main
-conda activate ltr-dqn
-pip install -r requirements.txt
-
-cd code
-python T3M1.py
-```
-
-Please do not run the table or figure scripts directly from the project root directory. These scripts assume that the current working directory is `code/`.
-
-### 8.4 Data Preparation
-
-The data files required by the reproduction scripts are stored under:
-
-```text
-code/data/
-```
-
-Please keep the original folder structure unchanged when running the reproduction scripts.
-
-The data source and access information are described in Section 4.
-
-### 8.5 Pretrained Models
-
-Reproducing the table results reported in the paper **does not require retraining the model**.
-
-The relevant models have already been trained. During reproduction, users can directly use the trained results, intermediate results, or model files provided in the repository.
-
-Therefore:
-
-- `DQN_train.py` is not required when reproducing tables using the provided outputs.
-- Unless retraining is needed, users do not need to run the training script.
-- To reproduce table results, users can directly run the corresponding `T*.py` scripts.
-
-### 8.6 Regenerating LambdaMART Intermediate Files
-
-The `temp_train` and `temp_test` files under `code/temp/oc/batch123/` are generated by `T4M10.py` and `T4C10.py`. `T4M10.py` corresponds to the Main Board market `0060`, and `T4C10.py` corresponds to the ChiNext market `3068`. These two scripts read the prepared data under `code/data/`, train the LambdaMART ranking model, and output intermediate CSV files containing `qid_date`, `stock_code`, `real_return`, `prediction`, `close`, and `pclose`.
-
-In the current replication package, these intermediate files are already provided. To prevent users from rerunning the scripts and overwriting the provided standard intermediate files, the save statements in `T4M10.py` and `T4C10.py` are commented out by default. If users wish to regenerate these files from the prepared input data, first uncomment the following statement:
-
-```python
-temp.to_csv(
-    f'temp/oc/batch{test_batch}/{dapan_code}temp_{train_or_test}_{metric}_train{train_year}_{shouxufei}_{yinhaushui}_{learning_rate}_{max_depth}_{n_estimators}.csv',
-    index=False
-)
-```
-
-Then run the corresponding commands from the `code/` directory. The parameters `train_or_test`, `shouxufei`, `yinhaushui`, `learning_rate`, `max_depth`, and `n_estimators` can be specified from the command line. Specifically, `train_or_test=train` generates the training-period files, while `train_or_test=test` generates the out-of-sample testing-period files.
-
-| Target file | Generation command |
-|---|---|
-| `0060temp_train_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0001_0.001_0.001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0001 --yinhaushui 0.001 --learning_rate 0.001 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.0001_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.0001 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.01_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.01 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.1_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 5 --n_estimators 1000` |
-| `0060temp_test_ndcg_train3_0.0003_0.001_0.2_5_1000.csv` | `python T4M10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.2 --max_depth 5 --n_estimators 1000` |
-| `3068temp_train_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test train --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 6 --n_estimators 1000` |
-| `3068temp_test_ndcg_train3_0.0003_0.001_0.1_6_1000.csv` | `python T4C10.py --train_or_test test --shouxufei 0.0003 --yinhaushui 0.001 --learning_rate 0.1 --max_depth 6 --n_estimators 1000` |
-
-For files with `train_year=2` or `train_year=4`, set `train_year` in the script to the corresponding value before running the same type of command. For files whose filenames contain different maximum tree depths or numbers of estimators, such as `_4_1000`, `_6_1000`, `_5_800`, `_5_900`, `_5_1100`, and `_5_1200`, specify the corresponding `--max_depth` and `--n_estimators` values from the command line.
-
-#### 8.6.1 Parameter Descriptions
-
-| Parameter | Description |
-|---|---|
-| `--bankuaicode` | Market code; `0060` = Main Board, `3068` = ChiNext. |
-| `--train_year` | Training window length, mainly `2`, `3`, or `4`. |
-| `--lr` | DQN learning rate; the main results use the default value `0.002`. |
-| `--train_or_test` | LambdaMART intermediate-file generation phase; `train` for the training period and `test` for the out-of-sample testing period. |
-| `--shouxufei` | Transaction fee; enters the intermediate filename and return calculation. |
-| `--yinhaushui` | Stamp duty; enters the intermediate filename and return calculation. |
-| `--learning_rate` | LambdaMART / XGBRanker learning rate; affects the ranking scores. |
-| `--max_depth` | Maximum tree depth of the LambdaMART / XGBRanker model; enters the intermediate filename and affects the ranking model. |
-| `--n_estimators` | Number of estimators / trees in the LambdaMART / XGBRanker model; enters the intermediate filename and affects the ranking model. |
-
-### 8.7 Retraining the DQN Model
-
-The DQN training script is:
-
-```text
-code/DQN_train.py
-```
-
-This script should be run from the `code/` directory.
-
-The two required command-line parameters are:
-
-| Parameter | Meaning | Possible values |
-|---|---|---|
-| `--bankuaicode` | Market code | `0060` for Main Board; `3068` for ChiNext |
-| `--train_year` | Training window length | `2`, `3`, or `4` |
-
-The default DQN hyperparameters used in the script are:
-
-| Parameter | Default value | Meaning |
-|---|---:|---|
-| `--lr` | `0.002` | Learning rate |
-| `--dec` | `0.00015` | Epsilon decay rate |
-| `--n_games` | `31` | Number of training episodes |
-| `--gamma` | `0.9` | Discount factor |
-| `--epsilon` | `1.0` | Initial epsilon |
-| `--eps_end` | `0.03` | Minimum epsilon |
-| `--batch_size` | `32` | Replay batch size |
-| `--fc1_dims` | `256` | Number of neurons in the first hidden layer |
-| `--fc2_dims` | `128` | Number of neurons in the second hidden layer |
-
-In the current implementation, the LTR ranking objective used in the experiments is fixed as `ndcg`, so users do not need to specify it separately when running `DQN_train.py`.
-
-Examples:
-
-```bash
-cd LTR-DQN-main
-conda activate ltr-dqn
-cd code
-
-# Main Board, 3-year training window
-python DQN_train.py --bankuaicode 0060 --train_year 3
-
-# ChiNext, 3-year training window
-python DQN_train.py --bankuaicode 3068 --train_year 3
-
-# Main Board, 2-year training window
-python DQN_train.py --bankuaicode 0060 --train_year 2
-
-# ChiNext, 4-year training window
-python DQN_train.py --bankuaicode 3068 --train_year 4
-```
-
-The trained DQN model files will be saved to:
-
-```text
-code/model/batch123/
-```
-
-The model-file naming rule is:
-
-```text
-{bankuaicode}_ndcg_{train_year}year_top4_train{train_year}TESToc
-{bankuaicode}_ndcg_{train_year}year_top4_train{train_year}TESToc_{lr}
-```
-
-Here, `bankuaicode` is the market code, where `0060` indicates the Main Board market and `3068` indicates the ChiNext market; `ndcg` indicates the LTR ranking objective used in the current experiments; `train_year` indicates the training-window length; `top4` indicates that the top four candidates are used in the DQN stage; and `lr` indicates the learning rate. When the default learning rate `0.002` is used, the model filename usually does not include an additional learning-rate suffix. When other learning rates are used for hyperparameter sensitivity analyses, the filename appends the corresponding learning-rate suffix.
-
-The model files retained under `code/model/batch123/` and their corresponding training commands are listed below. All commands should be run from the `code/` directory:
-
-```bash
-cd LTR-DQN-main/code
-```
-
-| Model file | Corresponding training command |
-|---|---|
-| `0060_ndcg_2year_top4_train2TESToc` | `python DQN_train.py --bankuaicode 0060 --train_year 2 --lr 0.002` |
-| `0060_ndcg_3year_top4_train3TESToc` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.002` |
-| `0060_ndcg_3year_top4_train3TESToc_0.0001` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.0001` |
-| `0060_ndcg_3year_top4_train3TESToc_0.001` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.001` |
-| `0060_ndcg_3year_top4_train3TESToc_0.01` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.01` |
-| `0060_ndcg_3year_top4_train3TESToc_0.1` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.1` |
-| `0060_ndcg_3year_top4_train3TESToc_0.2` | `python DQN_train.py --bankuaicode 0060 --train_year 3 --lr 0.2` |
-| `0060_ndcg_4year_top4_train4TESToc` | `python DQN_train.py --bankuaicode 0060 --train_year 4 --lr 0.002` |
-| `3068_ndcg_2year_top4_train2TESToc` | `python DQN_train.py --bankuaicode 3068 --train_year 2 --lr 0.002` |
-| `3068_ndcg_3year_top4_train3TESToc` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.002` |
-| `3068_ndcg_3year_top4_train3TESToc_0.0001` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.0001` |
-| `3068_ndcg_3year_top4_train3TESToc_0.001` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.001` |
-| `3068_ndcg_3year_top4_train3TESToc_0.01` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.01` |
-| `3068_ndcg_3year_top4_train3TESToc_0.1` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.1` |
-| `3068_ndcg_3year_top4_train3TESToc_0.2` | `python DQN_train.py --bankuaicode 3068 --train_year 3 --lr 0.2` |
-| `3068_ndcg_4year_top4_train4TESToc` | `python DQN_train.py --bankuaicode 3068 --train_year 4 --lr 0.002` |
-
-These model files support reproduction of the results reported in the paper and the related hyperparameter sensitivity analyses. For the main table results, the models with the default learning rate `0.002` are usually used. Models with learning-rate suffixes are mainly used for learning-rate sensitivity analysis.
-
-After retraining, users can run the corresponding `T*.py` scripts to reproduce the table results.
-
-### 8.8 Generation and Reuse of Key Summary Files
-
-#### 8.8.1 `F3F4.xlsx`
-
-`result/batch123/F3F4.xlsx` is the intermediate result table used for the hyperparameter sensitivity analyses in Figure 3 and Figure 4. In the current version, `F3.py` and `F4.py` directly read this file and plot the figures by default. They do not rerun the sensitivity analyses or write back to Excel.
-
-The default plotting commands are:
-
-```bash
-python F3.py
-python F4.py
-```
-
-To rerun the sensitivity analyses and write the results back to `F3F4.xlsx`, run:
-
-```bash
-python F3.py --run-analysis --write-excel
-python F4.py --run-analysis --write-excel
-```
-
-#### 8.8.2 `基准+模型结果对比.xlsx`
-
-`result/batch123/基准+模型结果对比.xlsx` is the return-curve summary file used for Figure 5 and Figure 6. It is generated by the T4-series scripts through the `T4ExcelWriter()` method. Each T4 script writes its corresponding market-index, baseline-portfolio, traditional machine-learning model, LTR model, or LTR-DQN result. `F5.py` and `F6.py` read this Excel file to plot return curves and the daily number of selected stocks.
-
-#### 8.8.3 `meiri_xuanze.csv`
-
-`code/temp/oc/batch123/meiri_xuanze.csv` is the daily stock-selection-count file for LTR-DQN. It is recorded during the LTR-DQN testing procedure in `T4M12.py`. Downstream testing and figure reproduction scripts read this file to keep the daily number of selected stocks fixed. In the file, column `60` corresponds to the Main Board market, and column `3068` corresponds to the ChiNext market.
-
-#### 8.8.4 Feature-importance files
-
-`result/batch123/feature_importance_LTR-DQN_0060.csv` and `result/batch123/feature_importance_LTR-DQN_3068.csv` can be generated by the feature-importance code block in `T4M11.py` or `T4C11.py`. By default, this write-out code block is commented out to avoid overwriting the results already provided in the replication package. If regeneration is required, uncomment the corresponding code block and rerun the script. The feature-importance results for the other models are generated by the corresponding feature-importance generation scripts used for Figure 7.
-
-### 8.9 Reproducing Table Results
-
-First enter the `code/` directory, and then run the corresponding scripts as needed. For example:
-
-```bash
-cd LTR-DQN-main/code
-python T4M1.py
-python T4M2.py
-python T4C1.py
-python T4C2.py
-```
-
-Or:
-
-```bash
-cd LTR-DQN-main/code
-python T6M5_1.py
-python T6M5_2.py
-```
-
-After running the corresponding script, the result for the relevant table will be generated.
-
-Regarding Table 7: the first three rows of Table 7, namely market indices, baseline portfolios, and LTR-DQN without ESG, are the same as the benchmark/reference results reported in Table 4. The additional Table 7 scripts generate ESG-related rows, including Negative Screening and Positive Investing results.
-
-### 8.10 Reproducing Figure Results
-
-Figure 3 to Figure 7 can be reproduced under the `code/` directory:
-
-```bash
-cd LTR-DQN-main/code
-python F3.py
-python F4.py
-python F5.py
-python F6.py
-python F7a.py
-python F7b.py
-```
-
-Before running these scripts, please ensure that the dependent files described in Section 7.3 are available.
-
-### 8.11 Randomness and Reproducibility Notes
-
-The DQN training process contains random components, such as random initialization, epsilon-greedy exploration, and sampling.
-
-For the Table 6 experiments, the random seeds used in the original runs are recorded in:
-
-```text
-code/temp/seed_summary.csv
-```
-
-To ensure reproducibility, the current Table 6 scripts continue to use these recorded seeds. Therefore, `code/temp/seed_summary.csv` must be retained when reproducing Table 6.
-
-For direct reproduction of the paper table results, users are advised to use the provided trained model files, recorded random seeds, and intermediate outputs. If users choose to retrain the DQN model instead of using the provided files, numerical differences may occur due to stochastic training, hardware differences, or differences in underlying library implementations.
-
-#### 8.11.1 Notes on Updated Results
-
-The current version synchronizes certain market-index and baseline-portfolio results with the outputs of the Python reproduction scripts. The related corrections mainly affect the market-index and baseline-portfolio rows in Table 3, as well as the ChiNext market-index row in Table 4. These corrections concern only benchmark/reference results and do not change the relative performance of LTR-DQN compared with traditional regression, classification, and standalone LTR models, nor do they change the main conclusions of the paper.
-
-### 8.12 Notes
-
-- All table-generation, figure-generation, and model-training scripts should be run from the `code/` directory.
-- Please keep the original repository structure unchanged, especially `code/data/`, `code/model/`, `code/temp/`, and `result/`.
-- Please ensure that the intermediate files and pretrained results are available.
-- Retraining the model is possible if necessary, but reproducing the table results reported in the paper does not require retraining.
-
-------
-
-## 9. Expected Runtime
-
-The actual runtime depends on hardware configuration, operating system, CPU/GPU availability, disk I/O, and whether users rely on the provided intermediate outputs or retrain the DQN model. Therefore, no fixed total runtime is reported here.
-
-In general:
-
-- When using the provided intermediate results, most standard single table-generation scripts usually finish within seconds to minutes.
-- The Table 6 scripts may take longer because they involve repeated sampling experiments; the exact runtime depends on the hardware configuration.
-- Figures 3 to 6 can be generated by the corresponding scripts when the required summary result files are available.
-- Retraining the model takes longer than directly reproducing the tables and is more sensitive to GPU availability.
-- The complete reproduction time for all tables varies across machines. If users choose to retrain models or regenerate intermediate results, the runtime will be longer.
-
-------
-
-## 10. Hardware Requirements
-
-The recommended hardware configuration is:
-
-- CPU: multi-core processor, 4 cores or more recommended
-- Memory: at least 16GB, 32GB recommended
-- GPU: NVIDIA GPU supporting CUDA 11.7 recommended
-- Python: 3.9.16
-
-Notes:
-
-- The project runs more efficiently in a GPU environment.
-- Running on CPU may be slow, especially for model retraining and repeated sampling experiments.
-
-------
-
-## 11. Additional Notes
-
-Please follow the instructions above and keep the repository structure unchanged. If path errors occur, check whether the current working directory is `code/`.
+These directories are uploaded as temporary GitHub Actions artifacts when
+needed; they are never committed by the workflows.
+
+## Locked environment
+
+The validated runtime is:
+
+- Python 3.9.13
+- NumPy 1.21.5
+- pandas 1.4.4
+- PyTorch 2.0.0 CPU
+- XGBoost 1.7.6
+
+Every executable entry point checks this runtime before starting an experiment.
+Changing seeds, model parameters, package versions, operating system, or the
+tree method defines a different experiment and may change fitted rankings.
+
+## Reproducibility contract
+
+- All long-running model artifacts are generated from the checked-in prepared
+  data.
+- The DQN stage consumes LambdaRank output from the same run.
+- Independent fixed seeds are used for every market, training window, and
+  stochastic stage.
+- T6 cloud shards partition the recorded seed sequence by position; merging the
+  shards reconstructs the same 500-seed cells as a single-machine run.
+- Manifests record runtime versions, source paths, and SHA-256 hashes.
+- Workflows have read-only repository permissions and never commit results.

@@ -1,0 +1,56 @@
+name: Reproduce Core
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reproduce-core-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reproduce:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      MPLBACKEND: Agg
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.9.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.9.13
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
+
+      - name: Install locked CPU environment
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements-lock.txt
+          python -m pip check
+          python -c "from experiment_core import validate_runtime; validate_runtime()"
+
+      - name: Train fresh rankers and DQN models
+        run: python train.py
+
+      - name: Generate tables and figures
+        run: python main.py --export_csvs
+
+      - name: Upload reproduction results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ltr-dqn-core-${{ github.run_id }}
+          path: |
+            results/
+            temp/train_manifest.json
+          if-no-files-found: warn
+          retention-days: 14
