@@ -63,7 +63,7 @@ def main() -> None:
         table_args.append("--export_csvs")
     if args.no_baselines:
         table_args.append("--no_baselines")
-    run_stage("Tables T3/T4/T5/T7", "workflow.py", table_args)
+    run_stage("Tables T3/T4/T5/T7", "model.py", table_args)
 
     if args.skip_figures:
         return

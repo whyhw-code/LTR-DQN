@@ -25,7 +25,7 @@ import xgboost as xgb
 from sklearn.linear_model import Lasso
 from sklearn.preprocessing import MinMaxScaler
 
-from experiment_core import (
+from model import (
     CODE_DIR,
     DATA_DIR,
     DQN_RANKER,
@@ -41,11 +41,12 @@ from experiment_core import (
     load_stock_data,
     runtime_versions,
     sha256,
+    stage_seed,
     train_dqn,
     validate_runtime,
+    baseline_ranking,
+    load_stage_seed_config,
 )
-from runtime_config import load_stage_seed_config, stage_seed
-from workflow import baseline_ranking
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -165,9 +166,8 @@ def file_signature(paths: Iterable[Path]) -> str:
 def implementation_paths() -> list[Path]:
     return [
         CODE_DIR / "Fig_main.py",
-        CODE_DIR / "experiment_core.py",
+        CODE_DIR / "model.py",
         CODE_DIR / "dl_dqn2.py",
-        CODE_DIR / "runtime_config.py",
     ]
 
 

@@ -21,16 +21,14 @@ from model import (
     PAPER_HYPERPARAMETERS,
     T4_MART_HYPERPARAMETERS,
     fit_ranker,
-    runtime_versions,
-    sha256,
-    train_dqn,
-    validate_runtime,
-)
-from runtime_config import (
     load_rank_config,
     load_stage_seed_config,
+    runtime_versions,
     set_global_determinism,
+    sha256,
     stage_seed,
+    train_dqn,
+    validate_runtime,
 )
 
 
@@ -286,7 +284,7 @@ def main() -> None:
     print(json.dumps({"run_dir": str(run_dir), "manifest": str(manifest_path)}, indent=2))
 
     if args.t6:
-        from t6_core import run_sampling
+        from T6_main import run_sampling
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]

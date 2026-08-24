@@ -80,7 +80,7 @@ jobs:
           path: t6-work
       - name: Run T6 seed shard ${{ matrix.shard }}
         run: >-
-          python t6_shard_runner.py
+          python T6_main.py --run_shard
           --run_dir t6-work
           --ranker_tree_method hist
           --shard_index ${{ matrix.shard }}
