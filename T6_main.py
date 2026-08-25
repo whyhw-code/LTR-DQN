@@ -11,6 +11,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -521,6 +525,89 @@ def load_raw_inputs(paths: list[Path]) -> pd.DataFrame:
     return merged
 
 
+def compute_c4(t6_csv: Path, data_path: Path) -> pd.DataFrame:
+    frame = pd.read_csv(require_file(t6_csv, "T6 500-seed selected results"))
+    required = {"market", "sampling_rate", "model", "seed", "ARR"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"T6 input is missing {missing}: {t6_csv}")
+    frame = frame[
+        frame.market.isin(MARKETS)
+        & frame.model.isin(MODELS)
+        & frame.sampling_rate.isin(SAMPLING_RATES)
+    ].copy()
+    counts = frame.groupby(["market", "sampling_rate", "model"]).size()
+    if len(counts) != 30 or not (counts == 500).all():
+        raise ValueError(f"Figure C4 requires 500 results per cell; found:\n{counts}")
+    frame["source_signature"] = sha256(t6_csv)
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(data_path, index=False, encoding="utf-8-sig")
+    return frame
+
+
+def plot_c4(frame: pd.DataFrame, path: Path) -> None:
+    colors = {
+        "LambdaRank": "#2AA6C8",
+        "LambdaMART": "#ED7D31",
+        "LTR-DQN": "#A6A6A6",
+    }
+    titles = {"Main": "Main board market", "ChiNext": "ChiNext market"}
+    fig, axes = plt.subplots(2, 1, figsize=(10.6, 7.2), sharex=False)
+    positions = np.arange(len(SAMPLING_RATES), dtype=float)
+    width = 0.22
+    for ax, market, panel in zip(axes, MARKETS, ("(a)", "(b)")):
+        subset = frame[frame.market == market]
+        for model_name, offset in zip(MODELS, (-width, 0.0, width)):
+            values = [
+                pd.to_numeric(
+                    subset[
+                        (subset.model == model_name)
+                        & (subset.sampling_rate == rate)
+                    ].ARR,
+                    errors="coerce",
+                ).dropna()
+                for rate in SAMPLING_RATES
+            ]
+            boxes = ax.boxplot(
+                values,
+                positions=positions + offset,
+                widths=width * 0.9,
+                patch_artist=True,
+                manage_ticks=False,
+                showfliers=True,
+                flierprops={
+                    "markersize": 2.2,
+                    "markerfacecolor": "#555555",
+                    "markeredgecolor": "#555555",
+                },
+            )
+            for box in boxes["boxes"]:
+                box.set_facecolor(colors[model_name])
+                box.set_edgecolor("#555555")
+            for element in ("whiskers", "caps", "medians"):
+                for artist in boxes[element]:
+                    artist.set_color("#555555")
+            boxes["boxes"][0].set_label(model_name)
+        ax.set_xticks(
+            positions, [f"{int(rate * 100)}%" for rate in SAMPLING_RATES]
+        )
+        ax.set_title(f"{panel} {titles[market]}", loc="left", fontsize=11)
+        ax.set_ylabel("Annualized return")
+        ax.legend(frameon=True, fontsize=8, loc="upper right")
+        ax.set_facecolor("white")
+        ax.grid(axis="y", color="#D9D9D9", linewidth=0.7, alpha=0.85)
+        ax.set_axisbelow(True)
+        for spine in ax.spines.values():
+            spine.set_color("#A6A6A6")
+            spine.set_linewidth(0.8)
+    axes[-1].set_xlabel("Sampling rate")
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"Saved: {path.resolve()}")
+
+
 def main() -> None:
     args = parse_args()
     validate_runtime()
@@ -541,13 +628,11 @@ def main() -> None:
     write_results(records, long_path, workbook_path)
     figure_path = None
     if not args.skip_figure:
-        from Appendix_Fig_main import compute_c4, plot_c4
-
         figure_dir = RESULTS_DIR / "appendix_figures"
         figure_data_dir = figure_dir / "data"
         figure_data_dir.mkdir(parents=True, exist_ok=True)
         figure_data_path = figure_data_dir / "FigC4_sampling_ARR.csv"
-        figure_frame = compute_c4(selected_path, figure_data_path, force=True)
+        figure_frame = compute_c4(selected_path, figure_data_path)
         figure_path = figure_dir / "FigC4_sampling_robustness_boxplots.png"
         plot_c4(figure_frame, figure_path)
     manifest = {
