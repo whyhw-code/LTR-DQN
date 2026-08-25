@@ -374,10 +374,11 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
         return SVR(kernel="rbf", C=1.0)
     if name == "XGB_R":
         return xgb.XGBRegressor(
-            # T4M6/T4C6 in the repository use 200 GPU trees for regression.
+            # GitHub Actions runs on CPU-only runners; hist is equivalent here
+            # and avoids requiring a CUDA device for the baseline comparison.
             objective="reg:squarederror", n_estimators=200, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="gpu_hist",
+            tree_method="hist",
         )
     if name == "SVM_C":
         return SVC(kernel="rbf", C=1.0)
@@ -385,10 +386,10 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
         return MLPClassifier(hidden_layer_sizes=(24,), max_iter=100, random_state=42)
     if name == "XGB_C":
         return xgb.XGBClassifier(
-            # T4M9/T4C9 in the repository use 150 GPU trees for classification.
+            # Keep the classifier runnable on the CPU-only GitHub runner.
             objective="reg:squarederror", n_estimators=150, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="gpu_hist",
+            tree_method="hist",
         )
     raise ValueError(f"Unsupported baseline model: {name}")
 

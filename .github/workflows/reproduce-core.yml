@@ -39,7 +39,7 @@ jobs:
           python -c "from model import validate_runtime; validate_runtime()"
 
       - name: Train fresh rankers and DQN models
-        run: python train.py
+        run: python train.py --ranker_tree_method hist
 
       - name: Generate tables and figures
         run: python main.py --export_csvs

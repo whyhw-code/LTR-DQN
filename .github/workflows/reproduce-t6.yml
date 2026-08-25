@@ -35,7 +35,7 @@ jobs:
           python -m pip check
           python -c "from model import validate_runtime; validate_runtime()"
       - name: Train the three-year models required by T6
-        run: python train.py --models all --years 3
+        run: python train.py --models all --years 3 --ranker_tree_method hist
       - name: Package T6 base artifacts
         shell: pwsh
         run: |
