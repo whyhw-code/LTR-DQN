@@ -36,7 +36,7 @@ jobs:
           python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
           python -m pip check
-          python -c "from experiment_core import validate_runtime; validate_runtime()"
+          python -c "from model import validate_runtime; validate_runtime()"
 
       - name: Train fresh rankers and DQN models
         run: python train.py

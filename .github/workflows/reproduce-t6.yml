@@ -33,7 +33,7 @@ jobs:
           python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
           python -m pip check
-          python -c "from experiment_core import validate_runtime; validate_runtime()"
+          python -c "from model import validate_runtime; validate_runtime()"
       - name: Train the three-year models required by T6
         run: python train.py --models all --years 3
       - name: Package T6 base artifacts
@@ -73,7 +73,7 @@ jobs:
           python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
           python -m pip check
-          python -c "from experiment_core import validate_runtime; validate_runtime()"
+          python -c "from model import validate_runtime; validate_runtime()"
       - uses: actions/download-artifact@v7
         with:
           name: t6-base-${{ github.run_id }}
@@ -111,7 +111,7 @@ jobs:
           python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
           python -m pip check
-          python -c "from experiment_core import validate_runtime; validate_runtime()"
+          python -c "from model import validate_runtime; validate_runtime()"
       - uses: actions/download-artifact@v7
         with:
           pattern: t6-shard-*-${{ github.run_id }}
