@@ -337,7 +337,7 @@ def validate_runtime() -> None:
         "python": "3.9.13",
         "numpy": "1.21.5",
         "pandas": "1.4.4",
-        "torch": "2.0.0+cpu",
+        "torch": "2.0.0+cu117",
         "xgboost": "1.7.6",
     }
     mismatches = {
@@ -352,7 +352,11 @@ def validate_runtime() -> None:
         )
         raise RuntimeError(
             f"The locked reproduction environment is required: {details}. "
-            "Install requirements.txt with Python 3.9.13 and the PyTorch CPU wheel."
+            "Install requirements.txt with Python 3.9.13 and the PyTorch CUDA 11.7 wheel."
+        )
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "A CUDA-capable GPU is required for this reproduction; CPU execution is disabled."
         )
 
 
@@ -374,11 +378,9 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
         return SVR(kernel="rbf", C=1.0)
     if name == "XGB_R":
         return xgb.XGBRegressor(
-            # GitHub Actions runs on CPU-only runners; hist is equivalent here
-            # and avoids requiring a CUDA device for the baseline comparison.
             objective="reg:squarederror", n_estimators=200, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="hist",
+            tree_method="gpu_hist",
         )
     if name == "SVM_C":
         return SVC(kernel="rbf", C=1.0)
@@ -386,10 +388,9 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
         return MLPClassifier(hidden_layer_sizes=(24,), max_iter=100, random_state=42)
     if name == "XGB_C":
         return xgb.XGBClassifier(
-            # Keep the classifier runnable on the CPU-only GitHub runner.
             objective="reg:squarederror", n_estimators=150, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="hist",
+            tree_method="gpu_hist",
         )
     raise ValueError(f"Unsupported baseline model: {name}")
 
@@ -411,12 +412,10 @@ def fit_ranker(
     seed = market_seed(code) if seed is None else seed
     set_global_determinism(seed)
     if tree_method is None:
-        # Match the GitHub T4M10/T4C10/T4M11/T4C11 scripts in the required
-        # XGBoost 1.7.6 environment.  The saved Top-4 canonical form below
-        # removes the remaining GPU floating-point noise for downstream use.
+        # Keep all ranker results on the CUDA XGBoost path.
         tree_method = "gpu_hist"
-    if tree_method not in {"hist", "exact", "approx", "gpu_hist"}:
-        raise ValueError(f"Unsupported ranker tree method: {tree_method}")
+    if tree_method != "gpu_hist":
+        raise ValueError(f"GPU execution is required for rankers; got tree_method={tree_method!r}")
     train, test = load_stock_data(market, train_year)
     # The paper ranker scripts normalize the complete train/test feature and
     # return ranges to [-1, 1] before fitting. Keeping this transformation here
@@ -618,7 +617,7 @@ def evaluate_dqn(
         eps_end=0.03, eps_dec=0.0001, input_dims=[13], lr=lr,
         fc1_dims=256, fc2_dims=128, verbose=False,
     )
-    agent.load_model(model_path, map_location=torch.device("cpu"))
+    agent.load_model(model_path, map_location=torch.device("cuda:0"))
     action_map = None
     action_column = "60" if code == "0060" else "3068"
     if fixed_actions:

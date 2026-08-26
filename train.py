@@ -73,8 +73,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n_games", type=int, default=31)
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument(
-        "--ranker_tree_method", choices=["auto", "hist", "exact", "approx", "gpu_hist"], default="auto",
-        help="Ranker tree builder; auto uses exact only for ChiNext LambdaMART and hist otherwise",
+        "--ranker_tree_method", choices=["gpu_hist"], default="gpu_hist",
+        help="GPU-only XGBoost tree builder",
     )
     parser.add_argument(
         "--t6", action="store_true",
@@ -102,7 +102,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--t6_require_gpu", action="store_true",
-        help="Require XGBoost gpu_hist for T6; fail instead of falling back to hist",
+        help="Deprecated compatibility flag; T6 always requires gpu_hist",
     )
     return parser.parse_args()
 
@@ -175,7 +175,7 @@ def main() -> None:
     selected = {item.strip().lower() for item in args.models.split(",")}
     train_rankers = "all" in selected or "rankers" in selected
     train_dqns = "all" in selected or "dqn" in selected
-    ranker_tree_method = None if args.ranker_tree_method == "auto" else args.ranker_tree_method
+    ranker_tree_method = args.ranker_tree_method
     manifest_path = (
         CODE_DIR / "temp" / "train_manifest.json"
         if run_dir == CODE_DIR.resolve()
@@ -319,8 +319,8 @@ def main() -> None:
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
             markets=t6_markets, max_seeds=args.t6_max_seeds,
-            use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=True,
-            dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
+            use_gpu=True, resume=True,
+            dqn_seed_path=dqn_seed_path, require_gpu=True,
         )
         t6_manifest = {
             "markets": t6_markets,

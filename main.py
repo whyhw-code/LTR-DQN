@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--export_csvs', action='store_true')
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--seed_config', type=Path, default=None)
-    parser.add_argument('--ranker_tree_method', choices=['auto', 'hist', 'exact', 'approx', 'gpu_hist'], default='auto')
+    parser.add_argument('--ranker_tree_method', choices=['gpu_hist'], default='gpu_hist')
     parser.add_argument('--no_baselines', action='store_true')
     parser.add_argument('--dqn_eval_mode', choices=['dqn', 'fixed'], default='dqn')
     parser.add_argument('--figures', default='3,4,5,6,7')
@@ -96,7 +96,7 @@ def _fig_parse_args() -> argparse.Namespace:
     parser.add_argument('--figures', default='3,4,5,6,7', help='Comma-separated subset of 3,4,5,6,7')
     parser.add_argument('--seed_config', type=Path, default=None)
     parser.add_argument('--seed', type=int, default=None)
-    parser.add_argument('--ranker_tree_method', choices=['auto', 'hist', 'exact', 'approx', 'gpu_hist'], default='auto', help='auto uses exact for ChiNext LambdaMART and hist otherwise')
+    parser.add_argument('--ranker_tree_method', choices=['gpu_hist'], default='gpu_hist', help='GPU-only XGBoost tree builder')
     parser.add_argument('--n_games', type=int, default=31, help='DQN episodes for Figure 3(b), matching train.py by default')
     parser.add_argument('--force', action='store_true', help='Recompute cached figure data instead of reusing data/*.csv')
     return parser.parse_args()
@@ -162,7 +162,9 @@ def _fig_rank_groups(frame: pd.DataFrame) -> list[int]:
 def _fig_fit_ranker_variant(market: str, model_name: str, *, learning_rate: float, max_depth: int, n_estimators: int, seed: int, tree_method: str) -> tuple[xgb.XGBRanker, pd.DataFrame]:
     """Fit the paper ranker while varying only the requested hyperparameters."""
     code = MARKETS[market]
-    resolved_tree_method = 'exact' if tree_method == 'auto' and model_name == 'LambdaMART' and (market == 'ChiNext') else 'hist' if tree_method == 'auto' else tree_method
+    if tree_method != 'gpu_hist':
+        raise ValueError(f'GPU execution is required for figures; got tree_method={tree_method!r}')
+    resolved_tree_method = 'gpu_hist'
     (train, test) = load_stock_data(market, 3)
     combined = pd.concat([train, test], ignore_index=True)
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
@@ -446,10 +448,12 @@ def _fig_compute_feature_importance(data_path: Path, seed_config: dict, seed_ove
         y_train = y_scaler.fit_transform(train[['real_return']]).ravel()
         lasso = Lasso(alpha=0.0001)
         lasso.fit(x_train, y_train)
-        resolved_tree_method = 'hist' if tree_method == 'auto' else tree_method
+        if tree_method != 'gpu_hist':
+            raise ValueError(f'GPU execution is required for feature importance; got tree_method={tree_method!r}')
+        resolved_tree_method = 'gpu_hist'
         xgb_model = xgb.XGBRegressor(objective='reg:squarederror', booster='gbtree', tree_method=resolved_tree_method, n_estimators=100, max_depth=4, learning_rate=0.1, subsample=1.0, colsample_bytree=0.8, random_state=stage_seed(code, 3, 'baseline', seed_config, seed_override), n_jobs=1)
         xgb_model.fit(x_train, y_train)
-        (rank_model, _) = _fig_fit_ranker_variant(market, 'LambdaRank', learning_rate=PAPER_HYPERPARAMETERS['LambdaRank'][code]['learning_rate'], max_depth=6, n_estimators=100, seed=stage_seed(code, 3, 'rank', seed_config, seed_override), tree_method='hist' if tree_method == 'auto' else tree_method)
+        (rank_model, _) = _fig_fit_ranker_variant(market, 'LambdaRank', learning_rate=PAPER_HYPERPARAMETERS['LambdaRank'][code]['learning_rate'], max_depth=6, n_estimators=100, seed=stage_seed(code, 3, 'rank', seed_config, seed_override), tree_method=tree_method)
         importance = {'LTR-DQN': _fig_minmax(rank_model.feature_importances_), 'LR': _fig_minmax(np.abs(lasso.coef_)), 'XGB_R': _fig_minmax(xgb_model.feature_importances_)}
         for (model, values) in importance.items():
             for (feature, value) in zip(FEATURES, values):

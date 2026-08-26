@@ -224,8 +224,10 @@ def make_ranker(market: str, model_name: str, seed: int, tree_method: str) -> xg
 
 def train_predict_temp(
     all_df: pd.DataFrame, market: str, rate: float, seed: int, model_name: str,
-    use_gpu: bool = True, require_gpu: bool = False,
+    use_gpu: bool = True, require_gpu: bool = True,
 ) -> pd.DataFrame:
+    if not use_gpu or not require_gpu:
+        raise RuntimeError("T6 is GPU-only; CPU fallback is disabled")
     set_seed(seed)
     if rate < 1.0:
         sampled = all_df.groupby("qid_date").apply(
@@ -239,7 +241,7 @@ def train_predict_temp(
     raw_test = sampled[(sampled.qid_date >= TEST_START) & (sampled.qid_date <= TEST_END)]
     x_train = train[XCOL_NAME].drop(columns=["qid_date"])
     y_train = train[["real_return"]].to_numpy()
-    methods = ["gpu_hist"] if require_gpu else (["gpu_hist", "hist"] if use_gpu else ["hist"])
+    methods = ["gpu_hist"]
     last_error = None
     for method in methods:
         try:
@@ -299,9 +301,11 @@ def run_sampling(
     output_path: Path, markets: list[str] | None = None,
     max_seeds: int | None = None, use_gpu: bool = True,
     resume: bool = True, include_full_rate: bool = True,
-    dqn_seed_path: Path | None = None, require_gpu: bool = False,
+    dqn_seed_path: Path | None = None, require_gpu: bool = True,
     shard_index: int = 0, shard_count: int = 1,
 ) -> pd.DataFrame:
+    if not use_gpu or not require_gpu:
+        raise RuntimeError("T6 is GPU-only; CPU fallback is disabled")
     if shard_count < 1 or not 0 <= shard_index < shard_count:
         raise ValueError("T6 shard_index must be in [0, shard_count)")
     markets = ["Main", "ChiNext"] if markets is None else markets
@@ -674,8 +678,8 @@ def parse_shard_args() -> argparse.Namespace:
     parser.add_argument("--seed_config", type=Path, default=None)
     parser.add_argument(
         "--ranker_tree_method",
-        choices=["hist", "gpu_hist"],
-        default="hist",
+        choices=["gpu_hist"],
+        default="gpu_hist",
     )
     return parser.parse_args()
 
@@ -711,11 +715,11 @@ def run_shard_cli() -> None:
         select_map_path=select_path,
         output_path=output_path,
         markets=markets,
-        use_gpu=args.ranker_tree_method == "gpu_hist",
+        use_gpu=True,
         resume=True,
         include_full_rate=args.shard_index == 0,
         dqn_seed_path=dqn_seed_path,
-        require_gpu=args.ranker_tree_method == "gpu_hist",
+        require_gpu=True,
         shard_index=args.shard_index,
         shard_count=args.shard_count,
     )

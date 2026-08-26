@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   reproduce:
-    runs-on: windows-2022
+    runs-on: ${{ vars.GPU_RUNNER_LABEL }}
     timeout-minutes: 360
     env:
       MPLBACKEND: Agg
@@ -29,20 +29,20 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - name: Install locked CPU environment
+      - name: Install locked CUDA environment
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install torch==2.0.0+cpu --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install torch==2.0.0+cu117 --index-url https://download.pytorch.org/whl/cu117
           python -m pip install -r requirements.txt
           python -m pip check
           python -c "from model import validate_runtime; validate_runtime()"
 
-      - name: Train fresh rankers and DQN models
-        run: python train.py --ranker_tree_method hist
+      - name: Train fresh rankers and DQN models on GPU
+        run: python train.py --ranker_tree_method gpu_hist
 
       - name: Generate tables and figures
-        run: python main.py --export_csvs
+        run: python main.py --export_csvs --ranker_tree_method gpu_hist
 
       - name: Upload reproduction results
         if: always()
