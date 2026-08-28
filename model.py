@@ -841,6 +841,12 @@ def load_stock_data(market: str, train_year: int) -> tuple[pd.DataFrame, pd.Data
 
 
 def model_for_baseline(name: str, market: str, train_year: int, seed: int):
+    tree_method = os.environ.get("LTR_DQN_BASELINE_TREE_METHOD", "gpu_hist")
+    if tree_method not in {"hist", "exact", "approx", "gpu_hist"}:
+        raise ValueError(
+            "LTR_DQN_BASELINE_TREE_METHOD must be one of "
+            "hist, exact, approx or gpu_hist"
+        )
     if name == "LR":
         return Lasso(alpha=0.0001)
     if name == "MLP_R":
@@ -853,7 +859,7 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
             # T4M6/T4C6 in the repository use 200 GPU trees for regression.
             objective="reg:squarederror", n_estimators=200, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="gpu_hist",
+            tree_method=tree_method,
         )
     if name == "SVM_C":
         return SVC(kernel="rbf", C=1.0)
@@ -864,7 +870,7 @@ def model_for_baseline(name: str, market: str, train_year: int, seed: int):
             # T4M9/T4C9 in the repository use 150 GPU trees for classification.
             objective="reg:squarederror", n_estimators=150, max_depth=4,
             learning_rate=0.1, subsample=1.0, colsample_bytree=0.8,
-            tree_method="gpu_hist",
+            tree_method=tree_method,
         )
     raise ValueError(f"Unsupported baseline model: {name}")
 
