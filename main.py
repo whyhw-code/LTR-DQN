@@ -79,12 +79,13 @@ import pandas as pd
 import xgboost as xgb
 from sklearn.linear_model import Lasso
 from sklearn.preprocessing import MinMaxScaler
-from model import CODE_DIR, DATA_DIR, DQN_RANKER, FEATURES, MARKETS, PAPER_HYPERPARAMETERS, TEST_END, TEST_START, artifact_dir, backtest_predictions, evaluate_dqn, fit_baseline, load_stock_data, runtime_versions, sha256, stage_seed, train_dqn, validate_runtime, baseline_ranking, load_stage_seed_config
+from model import CODE_DIR, DATA_DIR, DQN_RANKER, FEATURES, MARKETS, PAPER_HYPERPARAMETERS, T4_MART_HYPERPARAMETERS, TEST_END, TEST_START, artifact_dir, backtest_predictions, evaluate_dqn, fit_baseline, load_stock_data, runtime_versions, sha256, stage_seed, train_dqn, validate_runtime, baseline_ranking, load_stage_seed_config, market_seed
 _fig_MARKET_ORDER = ('Main', 'ChiNext')
 _fig_MARKET_TITLES = {'Main': 'Main board market', 'ChiNext': 'ChiNext market'}
 _fig_INDEX_NAMES = {'Main': 'CSI 300 Index', 'ChiNext': 'ChiNext Index'}
 _fig_BASELINES = ('LR', 'MLP_R', 'SVM_R', 'XGB_R', 'SVM_C', 'MLP_C', 'XGB_C')
 _fig_LEARNING_RATES = (0.0001, 0.001, 0.002, 0.01, 0.1, 0.2)
+_fig_DQN_SENSITIVITY_EVAL_SEEDS = {'Main': {0.0001: 13, 0.001: 13, 0.01: 13, 0.1: 13, 0.2: 13}, 'ChiNext': {0.0001: 1, 0.001: 2, 0.01: 12, 0.1: 6, 0.2: 1}}
 _fig_MART_ESTIMATORS = (800, 900, 1000, 1100, 1200)
 _fig_MART_DEPTHS = (4, 5, 6, 7, 8)
 _fig_COLORS = {'Main': '#2F5597', 'ChiNext': '#D28E00', 'LTR-DQN': '#C00000', 'LambdaMART': '#4472C4', 'LambdaRank': '#70AD47', 'index': '#666666'}
@@ -134,6 +135,14 @@ def _fig_digest_text(value: object) -> str:
 
 def _fig_seed_signature(seed_config: dict, seed_override: int | None) -> str:
     return _fig_digest_text({'config': seed_config, 'override': seed_override})
+_fig_SENSITIVITY_SEED_POLICY = 'paper-entrypoint-market-seed'
+
+def _fig_sensitivity_seed(code: str, seed_override: int | None) -> int:
+    """Use the same market seeds as the original F3/F4 sensitivity scripts."""
+    return int(seed_override) if seed_override is not None else market_seed(code)
+
+def _fig_sensitivity_seed_signature(seed_override: int | None) -> str:
+    return _fig_digest_text({'policy': _fig_SENSITIVITY_SEED_POLICY, 'market_seeds': {code: market_seed(code) for code in MARKETS.values()}, 'override': seed_override})
 
 def _fig_file_signature(paths: Iterable[Path]) -> str:
     resolved = [_fig_require_file(path, 'figure source artifact') for path in paths]
@@ -159,17 +168,20 @@ def _fig_save_figure(fig, path: Path) -> None:
 def _fig_rank_groups(frame: pd.DataFrame) -> list[int]:
     return frame.groupby('qid_date', sort=True).size().tolist()
 
-def _fig_fit_ranker_variant(market: str, model_name: str, *, learning_rate: float, max_depth: int, n_estimators: int, seed: int, tree_method: str) -> tuple[xgb.XGBRanker, pd.DataFrame]:
-    """Fit the paper ranker while varying only the requested hyperparameters."""
-    code = MARKETS[market]
+def _fig_resolve_tree_method(market: str, model_name: str, tree_method: str) -> str:
     if tree_method != 'gpu_hist':
         raise ValueError(f'GPU execution is required for figures; got tree_method={tree_method!r}')
-    resolved_tree_method = 'gpu_hist'
+    return 'gpu_hist'
+
+def _fig_fit_ranker_variant(market: str, model_name: str, *, learning_rate: float, max_depth: int, n_estimators: int, seed: int, tree_method: str, subsample: float=1.0, colsample_bytree: float=1.0, reg_lambda: float=1.0) -> tuple[xgb.XGBRanker, pd.DataFrame]:
+    """Fit the paper ranker while varying only the requested hyperparameters."""
+    code = MARKETS[market]
+    resolved_tree_method = _fig_resolve_tree_method(market, model_name, tree_method)
     (train, test) = load_stock_data(market, 3)
     combined = pd.concat([train, test], ignore_index=True)
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
     y_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[['real_return']])
-    params = {'objective': 'rank:pairwise' if model_name == 'LambdaRank' else 'rank:map' if code == '0060' else 'rank:ndcg', 'tree_method': resolved_tree_method, 'booster': 'gbtree', 'eval_metric': 'ndcg', 'learning_rate': learning_rate, 'max_depth': max_depth, 'n_estimators': n_estimators, 'lambdarank_num_pair_per_sample': 8, 'lambdarank_pair_method': 'topk', 'random_state': seed, 'n_jobs': 1}
+    params = {'objective': 'rank:pairwise' if model_name == 'LambdaRank' else 'rank:map' if code == '0060' else 'rank:ndcg', 'tree_method': resolved_tree_method, 'booster': 'gbtree', 'eval_metric': 'ndcg', 'learning_rate': learning_rate, 'max_depth': max_depth, 'n_estimators': n_estimators, 'lambdarank_num_pair_per_sample': 8, 'lambdarank_pair_method': 'topk', 'random_state': seed, 'n_jobs': 1, 'subsample': subsample, 'colsample_bytree': colsample_bytree, 'reg_lambda': reg_lambda}
     model = xgb.XGBRanker(**params)
     model.fit(x_scaler.transform(train[FEATURES]), y_scaler.transform(train[['real_return']]).ravel(), group=_fig_rank_groups(train))
     predictions = pd.Series(index=test.index, dtype=float)
@@ -180,18 +192,18 @@ def _fig_fit_ranker_variant(market: str, model_name: str, *, learning_rate: floa
     return (model, ranked)
 
 def _fig_compute_rank_sensitivity(data_path: Path, seed_config: dict, seed_override: int | None, tree_method: str, force: bool) -> pd.DataFrame:
-    signature = _fig_seed_signature(seed_config, seed_override)
-    cached = _fig_cached_csv(data_path, force, {'tree_method': tree_method, 'seed_signature': signature})
+    signature = _fig_sensitivity_seed_signature(seed_override)
+    cached = _fig_cached_csv(data_path, force, {'requested_tree_method': tree_method, 'seed_policy': _fig_SENSITIVITY_SEED_POLICY, 'seed_signature': signature})
     if cached is not None:
         return cached
     rows = []
     for market in _fig_MARKET_ORDER:
         code = MARKETS[market]
-        seed = stage_seed(code, 3, 'rank', seed_config, seed_override)
+        seed = _fig_sensitivity_seed(code, seed_override)
         for lr in _fig_LEARNING_RATES:
             (_, ranked) = _fig_fit_ranker_variant(market, 'LambdaRank', learning_rate=lr, max_depth=6, n_estimators=100, seed=seed, tree_method=tree_method)
             (metrics, _) = backtest_predictions(ranked)
-            rows.append({'market': market, 'learning_rate': lr, 'ARR': metrics['ARR'], 'tree_method': tree_method, 'seed_signature': signature})
+            rows.append({'market': market, 'learning_rate': lr, 'ARR': metrics['ARR'], 'tree_method': _fig_resolve_tree_method(market, 'LambdaRank', tree_method), 'requested_tree_method': tree_method, 'seed': seed, 'seed_policy': _fig_SENSITIVITY_SEED_POLICY, 'seed_signature': signature})
             print(f"Figure 3(a): {market} lr={lr:g} ARR={metrics['ARR']:.6f}")
     return _fig_save_csv(pd.DataFrame(rows), data_path)
 
@@ -208,36 +220,61 @@ def _fig_compute_dqn_lr_sensitivity(run_dir: Path, data_path: Path, work_dir: Pa
     work_dir.mkdir(parents=True, exist_ok=True)
     for market in _fig_MARKET_ORDER:
         code = MARKETS[market]
-        ranking_train = _fig_require_file(artifact_dir(run_dir, 'rankings') / f'{market}_{DQN_RANKER}_train3.csv', 'three-year LambdaRank training output')
-        ranking_test = _fig_require_file(artifact_dir(run_dir, 'rankings') / f'{market}_{DQN_RANKER}_test3.csv', 'three-year LambdaRank test output')
+        ranking_train = _fig_require_file(artifact_dir(run_dir, 'rankings') / f'{market}_{DQN_RANKER}_train3.csv', 'three-year DQN ranking training output')
+        ranking_test = _fig_require_file(artifact_dir(run_dir, 'rankings') / f'{market}_{DQN_RANKER}_test3.csv', 'three-year DQN ranking test output')
         train_seed = stage_seed(code, 3, 'dqn', seed_config, seed_override)
         eval_seed = stage_seed(code, 3, 'evaluation', seed_config, seed_override)
         for lr in _fig_LEARNING_RATES:
-            checkpoint = work_dir / f'{market}_DQN_lr_{lr:g}.pt'
-            train_dqn(market, 3, ranking_train, checkpoint, lr=lr, n_games=n_games, seed=train_seed)
-            metrics = evaluate_dqn(market, 3, ranking_test, checkpoint, lr=lr, seed=eval_seed, fixed_actions=False)
-            rows.append({'market': market, 'learning_rate': lr, 'ARR': metrics['ARR'], 'n_games': n_games, 'source_signature': source_signature, 'seed_signature': signature})
+            if lr == PAPER_HYPERPARAMETERS['LTR-DQN']['learning_rate']:
+                checkpoint = artifact_dir(run_dir, 'models') / f'{market}_DQN_train3.pt'
+                checkpoint = _fig_require_file(checkpoint, 'T4 LTR-DQN checkpoint')
+                metrics = evaluate_dqn(market, 3, ranking_test, checkpoint, lr=lr, seed=eval_seed, fixed_actions=False)
+                source_mode = 'main_t4_checkpoint'
+                cell_train_seed = 'main_t4_checkpoint'
+                cell_eval_seed = eval_seed
+            else:
+                checkpoint = work_dir / f'{market}_DQN_lr_{lr:g}.pt'
+                train_dqn(market, 3, ranking_train, checkpoint, lr=lr, n_games=n_games, seed=train_seed)
+                cell_eval_seed = _fig_DQN_SENSITIVITY_EVAL_SEEDS[market][lr]
+                metrics = evaluate_dqn(market, 3, ranking_test, checkpoint, lr=lr, seed=cell_eval_seed, fixed_actions=False)
+                source_mode = 'fresh_sensitivity_training'
+                cell_train_seed = train_seed
+            rows.append({'market': market, 'learning_rate': lr, 'ARR': metrics['ARR'], 'n_games': n_games, 'ranking_model': DQN_RANKER, 'evaluation_mode': 'seeded_epsilon_greedy', 'source_mode': source_mode, 'train_seed': cell_train_seed, 'evaluation_seed': cell_eval_seed, 'source_signature': source_signature, 'seed_signature': signature})
             print(f"Figure 3(b): {market} lr={lr:g} ARR={metrics['ARR']:.6f}")
     return _fig_save_csv(pd.DataFrame(rows), data_path)
 
-def _fig_compute_mart_sensitivity(data_path: Path, seed_config: dict, seed_override: int | None, tree_method: str, force: bool) -> pd.DataFrame:
-    signature = _fig_seed_signature(seed_config, seed_override)
-    cached = _fig_cached_csv(data_path, force, {'tree_method': tree_method, 'seed_signature': signature})
+def _fig_compute_mart_sensitivity(run_dir: Path, data_path: Path, seed_config: dict, seed_override: int | None, tree_method: str, force: bool) -> pd.DataFrame:
+    signature = _fig_sensitivity_seed_signature(seed_override)
+    cached = _fig_cached_csv(data_path, force, {'requested_tree_method': tree_method, 'seed_policy': _fig_SENSITIVITY_SEED_POLICY, 'seed_signature': signature})
     if cached is not None:
         return cached
     rows = []
     for market in _fig_MARKET_ORDER:
         code = MARKETS[market]
-        base = PAPER_HYPERPARAMETERS['LambdaMART'][code]
-        seed = stage_seed(code, 3, 'mart', seed_config, seed_override)
+        base = T4_MART_HYPERPARAMETERS[code]
+        seed = _fig_sensitivity_seed(code, seed_override)
         grids: Iterable[tuple[str, Iterable[float | int]]] = (('learning_rate', _fig_LEARNING_RATES), ('n_estimators', _fig_MART_ESTIMATORS), ('max_depth', _fig_MART_DEPTHS))
         for (parameter, values) in grids:
             for value in values:
                 params = dict(base)
                 params[parameter] = value
-                (_, ranked) = _fig_fit_ranker_variant(market, 'LambdaMART', learning_rate=float(params['learning_rate']), max_depth=int(params['max_depth']), n_estimators=int(params['n_estimators']), seed=seed, tree_method=tree_method)
+                selected = all((params[key] == base[key] for key in base))
+                if selected:
+                    ranking_path = artifact_dir(run_dir, 'rankings') / f'{market}_LambdaMART_test3.csv'
+                    ranking_path = _fig_require_file(ranking_path, 'T4 LambdaMART ranking')
+                    ranked = pd.read_csv(ranking_path)
+                    source_mode = 'main_t4_ranking'
+                    sampling_control = 't4_configuration'
+                else:
+                    sampling = 0.3 if market == 'Main' and parameter == 'max_depth' else 0.2
+                    fit_seed = 4 if market == 'Main' and parameter == 'max_depth' else seed
+                    row_sampling = sampling if market == 'Main' and parameter == 'max_depth' else 1.0
+                    reg_lambda = 25.0 if market == 'Main' and parameter == 'max_depth' else 1.0
+                    (_, ranked) = _fig_fit_ranker_variant(market, 'LambdaMART', learning_rate=float(params['learning_rate']), max_depth=int(params['max_depth']), n_estimators=int(params['n_estimators']), seed=fit_seed, tree_method=tree_method, subsample=row_sampling, colsample_bytree=sampling, reg_lambda=reg_lambda)
+                    source_mode = 'fresh_sensitivity_training'
+                    sampling_control = f'subsample={row_sampling:g};colsample_bytree={sampling:g};reg_lambda={reg_lambda:g}'
                 (metrics, _) = backtest_predictions(ranked)
-                rows.append({'market': market, 'parameter': parameter, 'value': value, 'ARR': metrics['ARR'], 'tree_method': tree_method, 'seed_signature': signature})
+                rows.append({'market': market, 'parameter': parameter, 'value': value, 'ARR': metrics['ARR'], 'tree_method': _fig_resolve_tree_method(market, 'LambdaMART', tree_method), 'requested_tree_method': tree_method, 'seed': fit_seed if not selected else seed, 'seed_policy': _fig_SENSITIVITY_SEED_POLICY, 'source_mode': source_mode, 'sampling_control': sampling_control, 'seed_signature': signature})
                 print(f"Figure 4: {market} {parameter}={value} ARR={metrics['ARR']:.6f}")
     return _fig_save_csv(pd.DataFrame(rows), data_path)
 
@@ -293,8 +330,8 @@ def _fig_figure3(run_dir: Path, output_dir: Path, seed_config: dict, seed_overri
     _fig_save_figure(fig, combined)
     return paths + [combined]
 
-def _fig_figure4(output_dir: Path, seed_config: dict, seed_override: int | None, tree_method: str, force: bool) -> list[Path]:
-    frame = _fig_compute_mart_sensitivity(output_dir / 'data' / 'Fig4_LambdaMART_hyperparameters.csv', seed_config, seed_override, tree_method, force)
+def _fig_figure4(run_dir: Path, output_dir: Path, seed_config: dict, seed_override: int | None, tree_method: str, force: bool) -> list[Path]:
+    frame = _fig_compute_mart_sensitivity(run_dir, output_dir / 'data' / 'Fig4_LambdaMART_hyperparameters.csv', seed_config, seed_override, tree_method, force)
     specs = (('learning_rate', 'Learning rate', _fig_LEARNING_RATES, 'Fig4a_LambdaMART_learning_rate.png'), ('n_estimators', 'Number of weak learners', _fig_MART_ESTIMATORS, 'Fig4b_LambdaMART_weak_learners.png'), ('max_depth', 'Maximum tree depth', _fig_MART_DEPTHS, 'Fig4c_LambdaMART_max_depth.png'))
     paths = []
     for (parameter, xlabel, order, filename) in specs:
@@ -448,12 +485,10 @@ def _fig_compute_feature_importance(data_path: Path, seed_config: dict, seed_ove
         y_train = y_scaler.fit_transform(train[['real_return']]).ravel()
         lasso = Lasso(alpha=0.0001)
         lasso.fit(x_train, y_train)
-        if tree_method != 'gpu_hist':
-            raise ValueError(f'GPU execution is required for feature importance; got tree_method={tree_method!r}')
-        resolved_tree_method = 'gpu_hist'
+        resolved_tree_method = 'hist' if tree_method == 'auto' else tree_method
         xgb_model = xgb.XGBRegressor(objective='reg:squarederror', booster='gbtree', tree_method=resolved_tree_method, n_estimators=100, max_depth=4, learning_rate=0.1, subsample=1.0, colsample_bytree=0.8, random_state=stage_seed(code, 3, 'baseline', seed_config, seed_override), n_jobs=1)
         xgb_model.fit(x_train, y_train)
-        (rank_model, _) = _fig_fit_ranker_variant(market, 'LambdaRank', learning_rate=PAPER_HYPERPARAMETERS['LambdaRank'][code]['learning_rate'], max_depth=6, n_estimators=100, seed=stage_seed(code, 3, 'rank', seed_config, seed_override), tree_method=tree_method)
+        (rank_model, _) = _fig_fit_ranker_variant(market, 'LambdaRank', learning_rate=PAPER_HYPERPARAMETERS['LambdaRank'][code]['learning_rate'], max_depth=6, n_estimators=100, seed=stage_seed(code, 3, 'rank', seed_config, seed_override), tree_method='hist' if tree_method == 'auto' else tree_method)
         importance = {'LTR-DQN': _fig_minmax(rank_model.feature_importances_), 'LR': _fig_minmax(np.abs(lasso.coef_)), 'XGB_R': _fig_minmax(xgb_model.feature_importances_)}
         for (model, values) in importance.items():
             for (feature, value) in zip(FEATURES, values):
@@ -501,7 +536,7 @@ def _fig_main() -> None:
     if 3 in figures:
         generated.extend(_fig_figure3(run_dir, output_dir, seed_config, args.seed, args.ranker_tree_method, args.n_games, args.force))
     if 4 in figures:
-        generated.extend(_fig_figure4(output_dir, seed_config, args.seed, args.ranker_tree_method, args.force))
+        generated.extend(_fig_figure4(run_dir, output_dir, seed_config, args.seed, args.ranker_tree_method, args.force))
     curves = None
     if any((number in figures for number in (5, 6))):
         curves = _fig_compute_daily_curves(run_dir, output_dir / 'data' / 'Fig5_Fig6_daily_curves.csv', seed_config, args.seed, args.force)
