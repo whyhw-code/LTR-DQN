@@ -36,13 +36,16 @@ jobs:
           python -c "from model import validate_runtime; validate_runtime()"
       - name: Train the three-year models required by T6
         run: python train.py --models all --years 3 --ranker_tree_method gpu_hist
+      - name: Generate the T4 baseline reused by the 100 percent row
+        run: python model.py --tables T4 --no_baselines --export_csvs
       - name: Package T6 base artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force t6-base/models, t6-base/rankings | Out-Null
+          New-Item -ItemType Directory -Force t6-base/models, t6-base/rankings, t6-base/results/combined | Out-Null
           Copy-Item model/*.pt t6-base/models/
           Copy-Item temp/rankings/*.csv t6-base/rankings/
           Copy-Item temp/train_manifest.json t6-base/train_manifest.json
+          Copy-Item results/combined/results_long.csv t6-base/results/combined/results_long.csv
       - uses: actions/upload-artifact@v7
         with:
           name: t6-base-${{ github.run_id }}

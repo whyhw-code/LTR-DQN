@@ -315,12 +315,14 @@ def main() -> None:
                 "Provide --t6_select_map with the frozen meiri_xuanze.csv file."
             )
         t6_output = CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv" if run_dir == CODE_DIR.resolve() else run_dir / "t6_runs" / "t6_raw.csv"
+        t4_results_path = artifact_dir(run_dir, "results") / "combined" / "results_long.csv"
         raw = run_sampling(
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
             markets=t6_markets, max_seeds=args.t6_max_seeds,
             use_gpu=True, resume=True,
             dqn_seed_path=dqn_seed_path, require_gpu=True,
+            t4_results_path=t4_results_path,
         )
         t6_manifest = {
             "markets": t6_markets,
@@ -332,6 +334,8 @@ def main() -> None:
             "require_gpu": args.t6_require_gpu,
             "select_map": str(select_path),
             "select_map_sha256": sha256(select_path),
+            "t4_results": str(t4_results_path),
+            "t4_results_sha256": sha256(t4_results_path),
             "raw_csv": str(t6_output),
             "raw_csv_sha256": sha256(t6_output),
             "rows": len(raw),

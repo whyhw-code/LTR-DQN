@@ -296,6 +296,41 @@ def load_select_map(path: Path, market: str) -> dict[int, int]:
     return dict(zip(frame.qid_date, frame[column]))
 
 
+def load_t4_full_rate(path: Path, markets: list[str]) -> dict[tuple[str, str], float]:
+    """Load the exact T4 ARR values used as Table 6's 100% baseline."""
+    path = path.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"T4 long-form results required by the T6 100% row not found: {path}. "
+            "Run main.py --export_csvs before T6."
+        )
+    frame = pd.read_csv(path)
+    required = {"table", "market", "model", "ARR"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"T4 long-form results are missing {missing}: {path}")
+    selected = frame[
+        (frame.table.astype(str).str.upper() == "T4")
+        & frame.market.isin(markets)
+        & frame.model.isin(("LambdaRank", "LambdaMART", "LTR-DQN"))
+    ].copy()
+    counts = selected.groupby(["market", "model"]).size()
+    expected = pd.MultiIndex.from_product(
+        [markets, ("LambdaRank", "LambdaMART", "LTR-DQN")],
+        names=["market", "model"],
+    )
+    if not counts.reindex(expected, fill_value=0).eq(1).all():
+        raise ValueError(
+            "T6 requires exactly one T4 ARR for every market/main-model pair; "
+            f"found:\n{counts}"
+        )
+    selected["ARR"] = pd.to_numeric(selected.ARR, errors="raise")
+    return {
+        (str(row.market), str(row.model)): float(row.ARR)
+        for row in selected.itertuples(index=False)
+    }
+
+
 def run_sampling(
     data_dir: Path, seed_path: Path, select_map_path: Path,
     output_path: Path, markets: list[str] | None = None,
@@ -303,6 +338,7 @@ def run_sampling(
     resume: bool = True, include_full_rate: bool = True,
     dqn_seed_path: Path | None = None, require_gpu: bool = True,
     shard_index: int = 0, shard_count: int = 1,
+    t4_results_path: Path | None = None,
 ) -> pd.DataFrame:
     if not use_gpu or not require_gpu:
         raise RuntimeError("T6 is GPU-only; CPU fallback is disabled")
@@ -313,8 +349,19 @@ def run_sampling(
     dqn_seed_path = dqn_seed_path or (CODE_DIR / "temp" / "dqn_seed_summary.csv")
     dqn_seed_df = load_dqn_seed_table(dqn_seed_path)
     existing = pd.read_csv(output_path) if resume and output_path.is_file() else pd.DataFrame()
+    if include_full_rate and not existing.empty:
+        # Discard legacy 100% rows that were independently retrained by T6.
+        existing = existing[pd.to_numeric(existing.sampling_rate, errors="coerce") != 1.0]
     done = set(zip(existing.get("market", []), existing.get("sampling_rate", []), existing.get("model", []), existing.get("seed", [])))
     rows = existing.to_dict(orient="records")
+    t4_full_rate = None
+    t4_source = None
+    if include_full_rate:
+        if t4_results_path is None:
+            raise ValueError("t4_results_path is required when include_full_rate is enabled")
+        t4_source = t4_results_path.resolve()
+        t4_full_rate = load_t4_full_rate(t4_source, markets)
+        t4_source_sha256 = sha256(t4_source)
     # Upgrade raw files written before the independent DQN ledger existed.
     # No ARR is recomputed; this only adds the missing provenance field.
     upgraded = False
@@ -354,25 +401,21 @@ def run_sampling(
         all_df = load_all_data(market, data_dir)
         select_map = load_select_map(select_map_path, market)
         if include_full_rate:
-            # The Appendix scripts enumerate 50%-90%. Table 6 also reports
-            # the no-sampling baseline. Use and record the first documented
-            # 90% candidate seed for this deterministic 100% run.
-            for suffix, model_name in (("1", "LambdaRank"), ("2", "LambdaMART")):
-                seed = get_seed_list(seed_df, market, 0.9, suffix, 1)[0]
-                key = (market, 1.0, model_name, seed)
-                if key in done:
-                    continue
-                temp = train_predict_temp(
-                    all_df, market, 1.0, seed, model_name,
-                    use_gpu=use_gpu, require_gpu=require_gpu,
-                )
-                rows.append({"market": market, "sampling_rate": 1.0, "sampling_label": "100%", "model": model_name, "seed": seed, "ARR": backtest_top4(temp), "sequence_position": sampling_sequence_position(market, 1.0, model_name)})
-                if model_name == "LambdaMART":
-                    dqn_seed = get_dqn_seed_list(dqn_seed_df, market, 0.9, 1)[0]
-                    rows.append({"market": market, "sampling_rate": 1.0, "sampling_label": "100%", "model": "LTR-DQN", "seed": seed, "dqn_seed": dqn_seed, "ARR": backtest_ltr_dqn(temp, select_map), "sequence_position": sampling_sequence_position(market, 1.0, "LTR-DQN")})
-                done.add(key)
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                pd.DataFrame(rows).to_csv(output_path, index=False, encoding="utf-8-sig")
+            for model_name in ("LambdaRank", "LambdaMART", "LTR-DQN"):
+                rows.append({
+                    "market": market,
+                    "sampling_rate": 1.0,
+                    "sampling_label": "100%",
+                    "model": model_name,
+                    "seed": -1,
+                    "ARR": t4_full_rate[(market, model_name)],
+                    "sequence_position": sampling_sequence_position(market, 1.0, model_name),
+                    "source": "T4",
+                    "source_path": str(t4_source),
+                    "source_sha256": t4_source_sha256,
+                })
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(rows).to_csv(output_path, index=False, encoding="utf-8-sig")
         for rate, label in zip(SAMPLING_RATES, SAMPLING_LABELS):
             for suffix, model_name in (("1", "LambdaRank"), ("2", "LambdaMART")):
                 seeds = get_seed_list(seed_df, market, rate, suffix, max_seeds)
@@ -650,7 +693,10 @@ def main() -> None:
         "selected_rows": len(selected),
         "cell_count": 30,
         "results_per_cell": 500,
-        "full_rate_source": "fresh_100_percent_rows",
+        "full_rate_source": "T4_results_long",
+        "full_rate_source_sha256": sorted(
+            set(raw.loc[raw.sampling_rate == 1.0, "source_sha256"].dropna())
+        ) if "source_sha256" in raw else [],
         "workbook": str(workbook_path),
         "workbook_sha256": sha256(workbook_path),
         "figure_c4": str(figure_path) if figure_path else None,
@@ -676,6 +722,10 @@ def parse_shard_args() -> argparse.Namespace:
     parser.add_argument("--markets", default="all")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--seed_config", type=Path, default=None)
+    parser.add_argument(
+        "--t4_results", type=Path, default=None,
+        help="Exact results_long.csv produced by T4; defaults to run_dir/results/combined/results_long.csv",
+    )
     parser.add_argument(
         "--ranker_tree_method",
         choices=["gpu_hist"],
@@ -708,6 +758,11 @@ def run_shard_cli() -> None:
     dqn_seed_path = CODE_DIR / "data" / "reproducibility" / "dqn_seed_summary.csv"
     select_path = generate_t6_select_map(run_dir, markets, seed_config, args.seed)
     output_path = run_dir / "t6_runs" / "t6_raw.csv"
+    t4_results_path = (
+        args.t4_results
+        if args.t4_results is not None
+        else run_dir / "results" / "combined" / "results_long.csv"
+    )
 
     raw = run_sampling(
         data_dir=CODE_DIR / "data",
@@ -722,6 +777,7 @@ def run_shard_cli() -> None:
         require_gpu=True,
         shard_index=args.shard_index,
         shard_count=args.shard_count,
+        t4_results_path=t4_results_path,
     )
 
     manifest = {
@@ -736,6 +792,8 @@ def run_shard_cli() -> None:
         "dqn_seed_summary_sha256": sha256(dqn_seed_path),
         "select_map": str(select_path),
         "select_map_sha256": sha256(select_path),
+        "t4_results": str(t4_results_path.resolve()),
+        "t4_results_sha256": sha256(t4_results_path),
         "raw_csv": str(output_path),
         "raw_csv_sha256": sha256(output_path),
         "rows": len(raw),

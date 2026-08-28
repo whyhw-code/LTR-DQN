@@ -9,6 +9,8 @@
 - **Reproduce Core**：生成 T3、T4、T5、T7、正文 Figures 3–7，以及附录 Figures C1、C2、C3、C5。
 - **Reproduce T6**：并行完成耗时较长的 T6，并生成附录 Figure C4。
 
+T6 的 `100%` 行直接复用同一次运行生成的 T4 主模型 ARR；仅 `50%`–`90%` 执行 500-seed 抽样实验。
+
 点击 **Run workflow**，完成后下载 Artifact；不需要本地 Python 环境。
 
 首次运行前，请在仓库 **Settings → Secrets and variables → Actions → Variables** 中添加 `GPU_RUNNER_LABEL`，值为你创建的 GitHub GPU larger runner 名称（例如 `gpu-t4`）。没有该变量或没有可用 GPU runner 时，工作流会停在等待 runner 或直接失败，不会改用 CPU。
