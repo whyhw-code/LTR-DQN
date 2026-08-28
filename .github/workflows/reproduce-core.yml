@@ -42,7 +42,7 @@ jobs:
         run: python train.py --ranker_tree_method gpu_hist
 
       - name: Generate tables and figures
-        run: python main.py --export_csvs --ranker_tree_method gpu_hist
+        run: python main.py --export_csvs --ranker_tree_method gpu_hist --force_figures
 
       - name: Upload reproduction results
         if: always()

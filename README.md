@@ -6,8 +6,8 @@
 
 进入仓库的 **Actions** 页面：
 
-- **Reproduce Core**：生成 T3、T4、T5、T7 及除 Figure C4 外的实证图。
-- **Reproduce T6**：并行完成耗时较长的 T6，并生成 Figure C4。
+- **Reproduce Core**：生成 T3、T4、T5、T7、正文 Figures 3–7，以及附录 Figures C1、C2、C3、C5。
+- **Reproduce T6**：并行完成耗时较长的 T6，并生成附录 Figure C4。
 
 点击 **Run workflow**，完成后下载 Artifact；不需要本地 Python 环境。
 
