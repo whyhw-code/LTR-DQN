@@ -32,6 +32,10 @@ create fresh `temp/`, `model/`, `runs/` and `results/` artifacts. The two seed
 ledgers in `data/reproducibility/` are included. T6's `100%` row reuses the
 T4 result from the same run; only the `50%`--`90%` cells run the seed sampling.
 
+For GitHub Actions, add the GPU larger-runner label as the repository variable
+`GPU_RUNNER_LABEL` under Settings -> Secrets and variables -> Actions -> Variables.
+The workflows intentionally fail when no GPU runner is available.
+
 This archive intentionally contains no generated results, intermediate CSVs,
 model checkpoints, caches or logs. Run outputs are created under `results/`,
 `temp/`, `model/` and `runs/` when the commands above are executed.
