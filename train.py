@@ -21,14 +21,16 @@ from model import (
     PAPER_HYPERPARAMETERS,
     T4_MART_HYPERPARAMETERS,
     fit_ranker,
-    load_rank_config,
-    load_stage_seed_config,
     runtime_versions,
-    set_global_determinism,
     sha256,
-    stage_seed,
     train_dqn,
     validate_runtime,
+)
+from runtime_config import (
+    load_rank_config,
+    load_stage_seed_config,
+    set_global_determinism,
+    stage_seed,
 )
 
 
@@ -73,8 +75,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n_games", type=int, default=31)
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument(
-        "--ranker_tree_method", choices=["gpu_hist"], default="gpu_hist",
-        help="GPU-only XGBoost tree builder",
+        "--ranker_tree_method", choices=["auto", "hist", "exact", "approx", "gpu_hist"], default="auto",
+        help="Ranker tree builder; auto uses exact only for ChiNext LambdaMART and hist otherwise",
     )
     parser.add_argument(
         "--t6", action="store_true",
@@ -102,7 +104,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--t6_require_gpu", action="store_true",
-        help="Deprecated compatibility flag; T6 always requires gpu_hist",
+        help="Require XGBoost gpu_hist for T6; fail instead of falling back to hist",
     )
     return parser.parse_args()
 
@@ -175,7 +177,7 @@ def main() -> None:
     selected = {item.strip().lower() for item in args.models.split(",")}
     train_rankers = "all" in selected or "rankers" in selected
     train_dqns = "all" in selected or "dqn" in selected
-    ranker_tree_method = args.ranker_tree_method
+    ranker_tree_method = None if args.ranker_tree_method == "auto" else args.ranker_tree_method
     manifest_path = (
         CODE_DIR / "temp" / "train_manifest.json"
         if run_dir == CODE_DIR.resolve()
@@ -284,7 +286,7 @@ def main() -> None:
     print(json.dumps({"run_dir": str(run_dir), "manifest": str(manifest_path)}, indent=2))
 
     if args.t6:
-        from T6_main import run_sampling
+        from t6_core import run_sampling
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]
@@ -315,14 +317,13 @@ def main() -> None:
                 "Provide --t6_select_map with the frozen meiri_xuanze.csv file."
             )
         t6_output = CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv" if run_dir == CODE_DIR.resolve() else run_dir / "t6_runs" / "t6_raw.csv"
-        t4_results_path = artifact_dir(run_dir, "results") / "combined" / "results_long.csv"
         raw = run_sampling(
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
             markets=t6_markets, max_seeds=args.t6_max_seeds,
-            use_gpu=True, resume=True,
-            dqn_seed_path=dqn_seed_path, require_gpu=True,
-            t4_results_path=t4_results_path,
+            use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=True,
+            dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
+            t4_results_path=artifact_dir(run_dir, "results") / "combined" / "results_long.csv",
         )
         t6_manifest = {
             "markets": t6_markets,
@@ -334,8 +335,6 @@ def main() -> None:
             "require_gpu": args.t6_require_gpu,
             "select_map": str(select_path),
             "select_map_sha256": sha256(select_path),
-            "t4_results": str(t4_results_path),
-            "t4_results_sha256": sha256(t4_results_path),
             "raw_csv": str(t6_output),
             "raw_csv_sha256": sha256(t6_output),
             "rows": len(raw),
