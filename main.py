@@ -1,6 +1,6 @@
 """Single evaluation entry point for the paper tables."""
 
-from workflow import main
+from model import main
 
 
 if __name__ == "__main__":

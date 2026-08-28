@@ -26,7 +26,7 @@ from model import (
     train_dqn,
     validate_runtime,
 )
-from runtime_config import (
+from model import (
     load_rank_config,
     load_stage_seed_config,
     set_global_determinism,
@@ -286,7 +286,7 @@ def main() -> None:
     print(json.dumps({"run_dir": str(run_dir), "manifest": str(manifest_path)}, indent=2))
 
     if args.t6:
-        from t6_core import run_sampling
+        from T6_main import run_sampling
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]

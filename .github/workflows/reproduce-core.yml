@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip check
-          python -c "from experiment_core import validate_runtime; validate_runtime()"
+          python -c "from model import validate_runtime; validate_runtime()"
       - name: Train rankers and DQN models
         run: python train.py
       - name: Export tables
