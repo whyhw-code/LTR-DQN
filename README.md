@@ -1,41 +1,116 @@
-# LTR-DQN reproducibility package
+# Deterministic T3/T4/T5/T6/T7 Reproduction
 
-This package contains the minimum Python code and locked configuration used
-to train LambdaRank/LambdaMART/DQN, export Tables T3--T7, and generate the
-main-text Figures 3--7 plus Appendix Figures C1--C5. Generated files are not
-stored in the repository.
+This directory is the clean reproduction workflow. It starts from source data,
+trains fresh LambdaRank, LambdaMART and DQN models, and exports the paper-format
+T3/T4/T5/T7 tables. The separate T6 sampling experiment reuses the original
+Mbox/Cbox sampling logic and records every seed before summarizing the paper's
+Mean/Std rows.
 
-## Reproduction environment
+## Clean initial layout
 
-- Python 3.9.13
+- `data/`: source data only; training never modifies these files.
+- `temp/`: contains the frozen `seed_summary.csv` and T6 action-map input;
+  fresh LambdaRank/LambdaMART CSVs, action CSVs and manifests are generated
+  here.
+- `model/`: initially empty; fresh DQN checkpoints are generated here.
+- `results/`: created by `main.py`; contains the final workbook and CSVs.
+- `train.py`: all long-running LambdaRank, LambdaMART and DQN training.
+- `main.py`: baseline fitting, model testing and T3/T4/T5/T7 multi-sheet export.
+- `T6_main.py`: read-only T6 aggregation from the fixed raw results and seed ledger.
+- `t6_core.py`: consolidated Appendix Mbox/Cbox sampling and backtest logic.
+
+The historical `batch123` rankings, checkpoints and daily action CSVs are not
+required by the default workflow.
+
+## Locked environment
+
+Use Python 3.9.x and the versions in `requirements-lock.txt` (the verified
+workspace runtime is Python 3.9.13), especially:
+
+- XGBoost 1.7.6
+- PyTorch 2.0.0 CPU
 - NumPy 1.21.5
 - pandas 1.4.4
-- PyTorch 2.0.0
-- XGBoost 1.7.6
+- scikit-learn 1.2.0
 
-Install the versions in `requirements.txt` before running the workflow.
+From this directory, verify the important versions with:
 
-## Commands
+```powershell
+python -c "import torch,xgboost,numpy,pandas; print(torch.__version__, xgboost.__version__, numpy.__version__, pandas.__version__)"
+```
+
+## Complete workflow
+
+Run the complete fresh training process. No seed argument is required because
+the market/year/stage seed map is locked in `runtime_config.py`:
 
 ```powershell
 python train.py
-python main.py --export_csvs
-python Fig_main.py
-python Appendix_Fig_main.py --figures C1,C2,C3,C5
-python train.py --models all --years 3 --t6 --ranker_tree_method gpu_hist --t6_require_gpu
-python T6_main.py
-python Appendix_Fig_main.py --figures C4
 ```
 
-The training commands require the original source files under `data/` and
-create fresh `temp/`, `model/`, `runs/` and `results/` artifacts. The two seed
-ledgers in `data/reproducibility/` are included. T6's `100%` row reuses the
-T4 result from the same run; only the `50%`--`90%` cells run the seed sampling.
+Then fit the fast baselines, test every fresh model, regenerate the DQN daily
+actions and export T3/T4/T5/T7:
 
-For GitHub Actions, add the GPU larger-runner label as the repository variable
-`GPU_RUNNER_LABEL` under Settings -> Secrets and variables -> Actions -> Variables.
-The workflows intentionally fail when no GPU runner is available.
+```powershell
+python main.py --export_csvs
+```
 
-This archive intentionally contains no generated results, intermediate CSVs,
-model checkpoints, caches or logs. Run outputs are created under `results/`,
-`temp/`, `model/` and `runs/` when the commands above are executed.
+The final workbook is:
+
+```text
+results/combined/results.xlsx
+```
+
+It contains one sheet each for T3, T4, T5 and T7. The same directory also
+contains one paper-format CSV per table, `results_long.csv` and
+`main_manifest.json`.
+
+## Table 6 sampling workflow
+
+In the initial experiment, sampling seeds were drawn from the integer range
+0..1500 and the resulting seed sequence was recorded so the sampling exercise
+could be reproduced. XGBoost version changes can alter fitted rankings even
+when the sampled observations are unchanged. For the locked XGBoost 1.7.6
+runtime, the same 0..1500 range was therefore re-evaluated and a compatible
+500-seed sequence was recorded as a version-aligned reproduction ledger.
+
+The exhaustive results and recorded ledger are fixed inputs:
+
+- `temp/t6_seed_search_raw.csv`: ARR for every seed in 0..1500.
+- `temp/seed_summary_search.csv`: recorded 500-seed sequence for the locked
+  XGBoost 1.7.6 reproduction runtime.
+
+Generate T6 without retraining:
+
+```powershell
+python T6_main.py
+```
+
+The paper-format output is `results/T6/T6.xlsx`; it contains the
+`T6_sampling` sheet. `T6_selected_raw.csv`, `T6_results_long.csv`,
+`T6_summary.csv` and `T6_manifest.json` provide the audit trail. The default
+100% column uses the manuscript Table 6 full-data reference; pass
+`--full_rate_csv` with `market,model,ARR` columns to replace it with a freshly
+computed full-data baseline. This ledger records the sequence used by the
+version-aligned reproduction. It should not be described as byte-for-byte
+identical to the initial experiment's archived ledger unless that original
+file is independently available for comparison.
+
+## Reproducibility contract
+
+- Paper-reported hyperparameters and the original DQN training/evaluation
+  behavior are unchanged.
+- Python, NumPy and PyTorch deterministic settings are enabled before every
+  stochastic stage.
+- Independent fixed seeds are used for each market, training window and stage.
+- DQN always consumes the LambdaMART CSV generated by the same fresh run;
+  LambdaRank remains an independent ranking-only baseline.
+- Default testing uses the trained DQN and regenerates seeded epsilon-greedy
+  actions. It does not replay historical daily-action files.
+- `train_manifest.json` stores seeds and hashes for rankings/checkpoints;
+  `main_manifest.json` stores hashes for generated action files.
+
+Use the same operating system, locked package versions and CPU execution for a
+byte-for-byte repeatability check. Changing `--seed`, `--seed_config`,
+`--rank_config`, `--lr`, `--n_games` or `--ranker_tree_method` creates a
+different experiment and is outside the default reproduction command.

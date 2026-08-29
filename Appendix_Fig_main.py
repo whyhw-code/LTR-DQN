@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from model import (
+from experiment_core import (
     CODE_DIR,
     DATA_DIR,
     FEES,
@@ -132,7 +132,7 @@ def file_signature(paths: Iterable[Path]) -> str:
 
 
 def implementation_paths() -> list[Path]:
-    return [CODE_DIR / "Appendix_Fig_main.py", CODE_DIR / "model.py"]
+    return [CODE_DIR / "Appendix_Fig_main.py", CODE_DIR / "experiment_core.py"]
 
 
 def cached_csv(path: Path, source_signature: str, force: bool) -> pd.DataFrame | None:

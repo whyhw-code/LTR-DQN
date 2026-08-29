@@ -25,7 +25,7 @@ import xgboost as xgb
 from sklearn.linear_model import Lasso
 from sklearn.preprocessing import MinMaxScaler
 
-from model import (
+from experiment_core import (
     CODE_DIR,
     DATA_DIR,
     DQN_RANKER,
@@ -40,13 +40,12 @@ from model import (
     fit_baseline,
     load_stock_data,
     runtime_versions,
-    resolve_tree_method,
     sha256,
     train_dqn,
     validate_runtime,
 )
-from model import load_stage_seed_config, stage_seed
-from model import baseline_ranking
+from runtime_config import load_stage_seed_config, stage_seed
+from workflow import baseline_ranking
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -166,7 +165,9 @@ def file_signature(paths: Iterable[Path]) -> str:
 def implementation_paths() -> list[Path]:
     return [
         CODE_DIR / "Fig_main.py",
-        CODE_DIR / "model.py",
+        CODE_DIR / "experiment_core.py",
+        CODE_DIR / "dl_dqn2.py",
+        CODE_DIR / "runtime_config.py",
     ]
 
 
@@ -202,7 +203,11 @@ def fit_ranker_variant(
 ) -> tuple[xgb.XGBRanker, pd.DataFrame]:
     """Fit the paper ranker while varying only the requested hyperparameters."""
     code = MARKETS[market]
-    resolved_tree_method = resolve_tree_method(tree_method)
+    resolved_tree_method = (
+        "exact" if tree_method == "auto" and model_name == "LambdaMART" and market == "ChiNext"
+        else "hist" if tree_method == "auto"
+        else tree_method
+    )
     train, test = load_stock_data(market, 3)
     combined = pd.concat([train, test], ignore_index=True)
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
@@ -743,7 +748,7 @@ def compute_feature_importance(
         y_train = y_scaler.fit_transform(train[["real_return"]]).ravel()
         lasso = Lasso(alpha=0.0001)
         lasso.fit(x_train, y_train)
-        resolved_tree_method = resolve_tree_method(tree_method)
+        resolved_tree_method = "hist" if tree_method == "auto" else tree_method
         xgb_model = xgb.XGBRegressor(
             objective="reg:squarederror", booster="gbtree", tree_method=resolved_tree_method,
             n_estimators=100, max_depth=4, learning_rate=0.1,
@@ -759,7 +764,7 @@ def compute_feature_importance(
             max_depth=6,
             n_estimators=100,
             seed=stage_seed(code, 3, "rank", seed_config, seed_override),
-            tree_method=resolve_tree_method(tree_method),
+            tree_method="hist" if tree_method == "auto" else tree_method,
         )
         importance = {
             "LTR-DQN": minmax(rank_model.feature_importances_),

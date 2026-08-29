@@ -26,7 +26,7 @@ from model import (
     train_dqn,
     validate_runtime,
 )
-from model import (
+from runtime_config import (
     load_rank_config,
     load_stage_seed_config,
     set_global_determinism,
@@ -225,8 +225,12 @@ def main() -> None:
                     )
                     train_path = rankings_dir / f"{market}_{model_name}_train{year}.csv"
                     test_path = rankings_dir / f"{market}_{model_name}_test{year}.csv"
-                    canonicalize_ranking(train_ranked).to_csv(train_path, index=False)
-                    canonicalize_ranking(test_ranked).to_csv(test_path, index=False)
+                    # Preserve the raw LambdaMART scores.  The original
+                    # backtest sorts these scores directly; collapsing them
+                    # to Top-4 labels changes tie handling on ChiNext and can
+                    # select a different report when DQN requests 1-3 stocks.
+                    train_ranked.to_csv(train_path, index=False)
+                    test_ranked.to_csv(test_path, index=False)
                     record = {
                         "market": market,
                         "train_year": year,
@@ -286,7 +290,7 @@ def main() -> None:
     print(json.dumps({"run_dir": str(run_dir), "manifest": str(manifest_path)}, indent=2))
 
     if args.t6:
-        from T6_main import run_sampling
+        from t6_core import run_sampling
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]
@@ -323,7 +327,6 @@ def main() -> None:
             markets=t6_markets, max_seeds=args.t6_max_seeds,
             use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=True,
             dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
-            t4_results_path=artifact_dir(run_dir, "results") / "combined" / "results_long.csv",
         )
         t6_manifest = {
             "markets": t6_markets,
