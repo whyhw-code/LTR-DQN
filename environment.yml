@@ -1,4 +1,4 @@
-name: ltr-dqn-gpu
+name: ltr-dqn
 channels:
   - defaults
 dependencies:
