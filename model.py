@@ -824,6 +824,13 @@ def runtime_versions() -> dict[str, str]:
     }
 
 
+def resolve_tree_method(tree_method: str | None) -> str:
+    """Resolve auto to GPU when CUDA is available, otherwise use CPU hist."""
+    if tree_method in (None, "auto"):
+        return "gpu_hist" if torch.cuda.is_available() else "hist"
+    return tree_method
+
+
 def validate_runtime() -> None:
     if xgb.__version__ != "1.7.6":
         raise RuntimeError(
@@ -841,7 +848,9 @@ def load_stock_data(market: str, train_year: int) -> tuple[pd.DataFrame, pd.Data
 
 
 def model_for_baseline(name: str, market: str, train_year: int, seed: int):
-    tree_method = os.environ.get("LTR_DQN_BASELINE_TREE_METHOD", "gpu_hist")
+    tree_method = resolve_tree_method(
+        os.environ.get("LTR_DQN_BASELINE_TREE_METHOD")
+    )
     if tree_method not in {"hist", "exact", "approx", "gpu_hist"}:
         raise ValueError(
             "LTR_DQN_BASELINE_TREE_METHOD must be one of "
@@ -891,11 +900,7 @@ def fit_ranker(
     code = MARKETS.get(market, market)
     seed = market_seed(code) if seed is None else seed
     set_global_determinism(seed)
-    if tree_method is None:
-        # Match the GitHub T4M10/T4C10/T4M11/T4C11 scripts in the required
-        # XGBoost 1.7.6 environment.  The saved Top-4 canonical form below
-        # removes the remaining GPU floating-point noise for downstream use.
-        tree_method = "gpu_hist"
+    tree_method = resolve_tree_method(tree_method)
     if tree_method not in {"hist", "exact", "approx", "gpu_hist"}:
         raise ValueError(f"Unsupported ranker tree method: {tree_method}")
     train, test = load_stock_data(market, train_year)
