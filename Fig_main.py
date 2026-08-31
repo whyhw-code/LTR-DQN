@@ -312,11 +312,11 @@ def compute_dqn_lr_sensitivity(
         code = MARKETS[market]
         ranking_train = require_file(
             artifact_dir(run_dir, "rankings") / f"{market}_{DQN_RANKER}_train3.csv",
-            "three-year LambdaRank training output",
+            "three-year LambdaMART training output",
         )
         ranking_test = require_file(
             artifact_dir(run_dir, "rankings") / f"{market}_{DQN_RANKER}_test3.csv",
-            "three-year LambdaRank test output",
+            "three-year LambdaMART test output",
         )
         train_seed = stage_seed(code, 3, "dqn", seed_config, seed_override)
         eval_seed = stage_seed(code, 3, "evaluation", seed_config, seed_override)

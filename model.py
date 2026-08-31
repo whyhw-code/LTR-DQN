@@ -45,13 +45,15 @@ def generate_table(
     seed: int | None = None,
     seed_config: Path | None = None,
     include_baselines: bool = True,
-    dqn_eval_mode: str = "fixed",
+    dqn_eval_mode: str = "dqn",
 ) -> dict:
     """Evaluate one table and write its long CSV, paper CSV and workbook."""
     validate_runtime()
     table = table.upper()
     if table not in {"T3", "T4", "T5", "T7"}:
         raise ValueError("table must be one of T3, T4, T5 or T7; T6 is separate")
+    if dqn_eval_mode != "dqn":
+        raise ValueError("DQN result generation must use the trained policy; fixed action maps are disabled")
     seed_map = load_stage_seed_config(seed_config)
     if seed is not None:
         set_global_determinism(seed)
@@ -64,12 +66,12 @@ def generate_table(
     elif table == "T4":
         run_table4(
             records, run_dir, selected, include_baselines, seed_map, seed,
-            dqn_fixed_actions=dqn_eval_mode == "fixed",
+            dqn_fixed_actions=False,
         )
     elif table == "T5":
         run_table5(
             records, run_dir, selected, include_baselines, seed_map, seed,
-            dqn_fixed_actions=dqn_eval_mode == "fixed",
+            dqn_fixed_actions=False,
         )
     else:
         run_table7(records, run_dir, selected, seed_map, seed)

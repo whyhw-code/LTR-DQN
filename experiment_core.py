@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,21 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC, SVR
 
 from dl_dqn2 import Agent, Environment
-from runtime_config import market_seed, set_global_determinism
+from runtime_config import (
+    configure_torch_threads,
+    LOCKED_RUNTIME,
+    market_seed,
+    set_global_determinism,
+    torch_device,
+)
+
+# Initialize both PyTorch worker pools before any model or tensor is created.
+# This removes the host-dependent inter-op pool size from the DQN contract.
+torch.set_num_threads(1)
+try:
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    pass
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -162,20 +178,51 @@ def canonicalize_ranking(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def runtime_versions() -> dict[str, str]:
+    configure_torch_threads(torch)
+    device = torch_device()
     return {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "numpy": np.__version__,
+        "pandas": pd.__version__,
+        "torch": torch.__version__,
+        "xgboost": xgb.__version__,
+        "device": str(device),
+        "cuda_available": str(bool(torch.cuda.is_available())),
+        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none",
+        "torch_threads": str(torch.get_num_threads()),
+        "torch_interop_threads": str(torch.get_num_interop_threads()),
+        "omp_num_threads": os.environ.get("OMP_NUM_THREADS", ""),
+        "mkl_num_threads": os.environ.get("MKL_NUM_THREADS", ""),
+        "openblas_num_threads": os.environ.get("OPENBLAS_NUM_THREADS", ""),
+    }
+
+
+def validate_runtime() -> None:
+    configure_torch_threads(torch)
+    actual = {
         "python": platform.python_version(),
         "numpy": np.__version__,
         "pandas": pd.__version__,
         "torch": torch.__version__,
         "xgboost": xgb.__version__,
     }
-
-
-def validate_runtime() -> None:
-    if xgb.__version__ != "1.7.6":
+    mismatches = {
+        name: (LOCKED_RUNTIME[name], value)
+        for name, value in actual.items()
+        if value != LOCKED_RUNTIME[name]
+    }
+    if mismatches:
+        details = ", ".join(
+            f"{name}={found!r} (required {expected!r})"
+            for name, (expected, found) in mismatches.items()
+        )
         raise RuntimeError(
-            f"This reproduction workflow requires xgboost==1.7.6; found {xgb.__version__}. "
-            "Run it with the configured .conda-repro-full environment."
+            "Locked reproduction environment mismatch: " + details + ". "
+            "Create the environment from requirements-lock.txt or environment.yml; "
+            "the run was stopped before fitting any model."
         )
 
 
@@ -233,9 +280,8 @@ def fit_ranker(
     seed = market_seed(code) if seed is None else seed
     set_global_determinism(seed)
     if tree_method is None:
-        # Match the GitHub T4M10/T4C10/T4M11/T4C11 scripts in the required
-        # XGBoost 1.7.6 environment.  The saved Top-4 canonical form below
-        # removes the remaining GPU floating-point noise for downstream use.
+        # Preserve the original GPU LambdaRank/LambdaMART training path.  A
+        # CPU-only run can explicitly pass ``--ranker_tree_method hist``.
         tree_method = "gpu_hist"
     if tree_method not in {"hist", "exact", "approx", "gpu_hist"}:
         raise ValueError(f"Unsupported ranker tree method: {tree_method}")
@@ -251,6 +297,8 @@ def fit_ranker(
     y_train = y_scaler.transform(train[["real_return"]]).ravel()
     params = {
         "tree_method": tree_method,
+        "random_state": int(seed),
+        "n_jobs": 1,
         "lambdarank_num_pair_per_sample": 8,
         "lambdarank_pair_method": "topk",
         "booster": "gbtree",
@@ -264,8 +312,6 @@ def fit_ranker(
             # These two values are not reported for LambdaRank in Table C1.
             "max_depth": 6 if rank_max_depth is None else rank_max_depth,
             "n_estimators": 100 if rank_n_estimators is None else rank_n_estimators,
-            "random_state": seed,
-            "n_jobs": 1,
         })
     elif model_name == "LambdaMART":
         mart_params = PAPER_HYPERPARAMETERS["LambdaMART"][code]
@@ -375,6 +421,13 @@ def train_dqn(
     lr: float = 0.002,
     n_games: int = 31,
     seed: int | None = None,
+    gamma: float = 0.9,
+    epsilon: float = 1.0,
+    eps_end: float = 0.03,
+    eps_dec: float = 0.00015,
+    batch_size: int = 32,
+    max_mem_size: int = 100,
+    replace_target_iter: int = 8,
 ) -> str:
     code = MARKETS.get(market, market)
     seed = market_seed(code) if seed is None else seed
@@ -383,7 +436,11 @@ def train_dqn(
         "trade_date", "qid_date", "open", "high", "low", "close",
         "vol", "amount", "pct_chg", "group_len",
     ])
-    ranked = pd.read_csv(ranking_file)
+    data = data.sort_values(["qid_date", "trade_date"], kind="mergesort").reset_index(drop=True)
+    ranked = pd.read_csv(ranking_file).sort_values(
+        ["qid_date", "stock_code"], kind="mergesort"
+    ).reset_index(drop=True)
+    configure_torch_threads(torch)
     env = Environment(
         data,
         ranked,
@@ -391,8 +448,9 @@ def train_dqn(
         end_date=TRAIN_END,
     )
     agent = Agent(
-        gamma=0.9, epsilon=1.0, batch_size=32, n_actions=5,
-        eps_end=0.03, eps_dec=0.00015, input_dims=[13],
+        gamma=gamma, epsilon=epsilon, batch_size=batch_size, n_actions=5,
+        max_mem_size=max_mem_size, eps_end=eps_end, eps_dec=eps_dec,
+        replace_target_iter=replace_target_iter, input_dims=[13],
         fc1_dims=256, fc2_dims=128, lr=lr, verbose=False,
     )
     for episode in range(n_games):
@@ -405,7 +463,13 @@ def train_dqn(
             agent.learn()
             observation = observation_
     model_path.parent.mkdir(parents=True, exist_ok=True)
-    agent.save_model(model_path, metadata={"market": code, "train_year": train_year, "seed": seed, "n_games": n_games})
+    agent.save_model(model_path, metadata={
+        "market": code, "train_year": train_year, "seed": seed,
+        "n_games": n_games, "gamma": gamma, "epsilon": epsilon,
+        "eps_end": eps_end, "eps_dec": eps_dec,
+        "batch_size": batch_size, "max_mem_size": max_mem_size,
+        "replace_target_iter": replace_target_iter,
+    })
     return agent.model_state_hash()
 
 
@@ -420,6 +484,11 @@ def evaluate_dqn(
     return_daily: bool = False,
     fixed_actions: bool = False,
 ) -> dict[str, float] | tuple[dict[str, float], pd.DataFrame]:
+    if fixed_actions:
+        raise ValueError(
+            "Fixed DQN action maps are not supported for T3/T4/T5/T7; "
+            "actions must be generated by the trained policy."
+        )
     code = MARKETS.get(market, market)
     seed = 1795 if seed is None else seed
     set_global_determinism(seed)
@@ -427,39 +496,30 @@ def evaluate_dqn(
         "trade_date", "qid_date", "open", "high", "low", "close",
         "vol", "amount", "pct_chg", "group_len",
     ])
-    ranked = pd.read_csv(ranking_file)
+    data = data.sort_values(["qid_date", "trade_date"], kind="mergesort").reset_index(drop=True)
+    ranked = pd.read_csv(ranking_file).sort_values(
+        ["qid_date", "stock_code"], kind="mergesort"
+    ).reset_index(drop=True)
+    configure_torch_threads(torch)
     env = Environment(data, ranked, start_date=20211022, end_date=TEST_END)
     agent = Agent(
-        # Match T4M12/T4C12: testing keeps a small exploration rate and
-        # continues the online replay update after each test-day action.
+        # Match the original DQN test loop: seeded epsilon-greedy actions and
+        # replay updates are retained so the native policy is evaluated under
+        # the same online-update protocol.
         gamma=0.9, epsilon=0.03, batch_size=32, n_actions=5,
         eps_end=0.03, eps_dec=0.0001, input_dims=[13], lr=lr,
         fc1_dims=256, fc2_dims=128, verbose=False,
     )
     agent.load_model(model_path, map_location=torch.device("cpu"))
-    action_map = None
-    action_column = "60" if code == "0060" else "3068"
-    if fixed_actions:
-        # The original T5 entry points use a year-specific daily action map:
-        # T4/3-year -> meiri_xuanze.csv, T5/2-year -> meiri_xuanze2.csv,
-        # and T5/4-year -> meiri_xuanze4.csv.
-        action_name = "meiri_xuanze.csv" if train_year == 3 else f"meiri_xuanze{train_year}.csv"
-        action_path = CODE_DIR / "temp" / "oc" / "batch123" / action_name
-        if not action_path.is_file():
-            raise FileNotFoundError(f"Fixed T4 action map not found: {action_path}")
-        action_map = pd.read_csv(action_path, usecols=["qid_date", action_column])
-        action_map["qid_date"] = pd.to_numeric(action_map["qid_date"], errors="coerce").astype(int)
     rows = []
     observation = env.reset()
     done = False
     while not done:
         date = int(env.qid_date)
-        if action_map is not None:
-            date_actions = action_map.loc[action_map.qid_date == date, action_column]
-            action = int(date_actions.iloc[0]) if not date_actions.empty else 0
-        else:
-            action = agent.choose_action(observation)
+        action = agent.choose_action(observation)
         observation_, reward, done, real_action, positive_count = env.step(action)
+        # Each test transition is replayed through the online network; the
+        # evaluation seed makes the epsilon-greedy trajectory reproducible.
         agent.store_transition(observation, action, reward, observation_, done)
         agent.learn()
         rows.append({

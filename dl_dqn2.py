@@ -8,15 +8,27 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
+from runtime_config import torch_device
+
 class Environment():
     def __init__(self, data, temp_data, start_date, end_date):
-        self.data = data
-        self.temp_data = temp_data
+        # Work on private, canonically ordered copies.  The source CSV order
+        # must not influence tied predictions or the flattened observation.
+        self.data = data.copy().sort_values(
+            ["qid_date", "trade_date"], kind="mergesort"
+        ).reset_index(drop=True)
+        self.temp_data = temp_data.copy().sort_values(
+            ["qid_date", "stock_code"], kind="mergesort"
+        ).reset_index(drop=True)
 
         self.data = self.data.fillna(0)
         self.temp_data = self.temp_data.fillna(0)
-        self.data['qid_date'] = pd.to_numeric(self.data['qid_date'].str.replace('-', ''))
-        self.data['trade_date'] = pd.to_numeric(self.data['trade_date'].str.replace('-', ''))
+        self.data['qid_date'] = pd.to_numeric(
+            self.data['qid_date'].astype(str).str.replace('-', '', regex=False)
+        )
+        self.data['trade_date'] = pd.to_numeric(
+            self.data['trade_date'].astype(str).str.replace('-', '', regex=False)
+        )
         # 提取需要归一化的列
         features_to_normalize = self.data.drop(columns=['qid_date', 'trade_date'])
         # 计算最小值和最大值
@@ -65,7 +77,9 @@ class Environment():
         #
         selected_df = self.temp_data[self.temp_data['qid_date'] == self.qid_date]
         # 基于 prediction 由高到低排序
-        selected_df = selected_df.sort_values(by='prediction', ascending=False)
+        selected_df = selected_df.sort_values(
+            by='prediction', ascending=False, kind='mergesort'
+        )
         # 选择前 action 个研报数据
         if action_ > len(selected_df):
             action_ = len(selected_df)
@@ -132,7 +146,9 @@ class DeepQNetwork(nn.Module):
         self.optimizer = optim.Adam(self.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-08)
         self.loss = nn.MSELoss()
 
-        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
+        # Cross-device reproduction uses CPU by default.  CUDA is opt-in via
+        # LTR_DQN_DEVICE=cuda and is therefore never selected accidentally.
+        self.device = torch_device()
         self.to(self.device)
 
     def forward(self, state):
@@ -150,8 +166,8 @@ class Agent():
     # epsilon探索率ϵ。即策略是以1−ϵ的概率选择当前最大价值的动作，以ϵ的概率随机选择新动作。
     def __init__(self, gamma, epsilon, lr, input_dims, batch_size, n_actions=5,
                  max_mem_size=100, eps_end=0.03, eps_dec=0.0002, fc1_dims=256,
-                 fc2_dims=128, verbose=True):
-        self.replace_target_iter = 8
+                 fc2_dims=128, verbose=True, replace_target_iter=8):
+        self.replace_target_iter = int(replace_target_iter)
         self.learn_step_counter = 0
         self.gamma = gamma
         self.epsilon = epsilon

@@ -88,8 +88,8 @@ def parse_args() -> argparse.Namespace:
         help="Skip the fast baseline train-and-test step",
     )
     parser.add_argument(
-        "--dqn_eval_mode", choices=["dqn", "fixed"], default="fixed",
-        help="fixed replays the paper's recorded daily action map; dqn regenerates seeded actions",
+        "--dqn_eval_mode", choices=["dqn"], default="dqn",
+        help="Generate actions from the trained DQN policy deterministically.",
     )
     return parser.parse_args()
 
@@ -112,6 +112,59 @@ def require_file(path: Path, purpose: str) -> Path:
     return path
 
 
+def validate_dqn_training_input(
+    run_dir: Path, market: str, year: int, test_ranking: Path
+) -> None:
+    """Reject DQN checkpoints trained from a different ranker or run.
+
+    DQN state features must come from the LambdaMART ranking generated for
+    this run.  Older artifacts may still contain a ``ranking_model`` entry of
+    ``LambdaRank``; accepting them would silently produce a different
+    experiment while the result file still looks valid.
+    """
+    root = Path(run_dir).resolve()
+    manifest_path = (
+        CODE_DIR / "temp" / "train_manifest.json"
+        if root == CODE_DIR.resolve()
+        else root / "train_manifest.json"
+    )
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"DQN training manifest not found: {manifest_path}. "
+            "Run train.py after generating LambdaMART rankings."
+        )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    records = [
+        item for item in manifest.get("dqn", [])
+        if item.get("market") == market and int(item.get("train_year", -1)) == int(year)
+    ]
+    if len(records) != 1:
+        raise ValueError(
+            f"Expected one DQN manifest record for {market}/year {year}; found {len(records)}."
+        )
+    record = records[0]
+    if record.get("ranking_model") != DQN_RANKER:
+        raise ValueError(
+            f"DQN checkpoint for {market}/year {year} was trained from "
+            f"{record.get('ranking_model')!r}, not {DQN_RANKER!r}. Retrain DQN from LambdaMART."
+        )
+    expected_train = artifact_dir(root, "rankings") / f"{market}_{DQN_RANKER}_train{year}.csv"
+    if not expected_train.is_file():
+        raise FileNotFoundError(f"DQN LambdaMART training ranking not found: {expected_train}")
+    declared_name = Path(str(record.get("ranking_input", ""))).name
+    if declared_name != expected_train.name:
+        raise ValueError(
+            f"DQN manifest ranking input is {declared_name!r}; expected {expected_train.name!r}."
+        )
+    declared_hash = record.get("ranking_input_sha256")
+    if declared_hash and declared_hash != sha256(expected_train):
+        raise ValueError(
+            f"DQN LambdaMART training ranking hash mismatch for {market}/year {year}."
+        )
+    if test_ranking.name != f"{market}_{DQN_RANKER}_test{year}.csv":
+        raise ValueError(f"DQN test ranking must be a LambdaMART file, got {test_ranking.name!r}.")
+
+
 def evaluate_ranker(run_dir: Path, market: str, year: int, model: str) -> dict[str, float]:
     path = require_file(
         artifact_dir(run_dir, "rankings") / f"{market}_{model}_test{year}.csv",
@@ -132,6 +185,7 @@ def evaluate_dqn_model(
     model_path = require_file(
         artifact_dir(run_dir, "models") / f"{market}_DQN_train{year}.pt", "DQN model"
     )
+    validate_dqn_training_input(run_dir, market, year, ranking)
     metrics, daily = evaluate_dqn(
         market, year, ranking, model_path,
         seed=stage_seed(MARKETS[market], year, "evaluation", seed_config, seed_override),
@@ -147,7 +201,7 @@ def evaluate_dqn_model(
     provenance = {
         "market": market,
         "train_year": year,
-        "evaluation_mode": "fixed" if fixed_actions else "seeded_epsilon_greedy",
+        "evaluation_mode": "deterministic_greedy_online_updates",
         "evaluation_seed": stage_seed(
             MARKETS[market], year, "evaluation", seed_config, seed_override
         ),
@@ -174,6 +228,7 @@ def evaluate_dqn_with_actions(
     model_path = require_file(
         artifact_dir(run_dir, "models") / f"{market}_DQN_train{year}.pt", "DQN model"
     )
+    validate_dqn_training_input(run_dir, market, year, ranking)
     evaluation_seed = stage_seed(
         MARKETS[market], year, "evaluation", seed_config, seed_override
     )
@@ -181,7 +236,7 @@ def evaluate_dqn_with_actions(
         market, year, ranking, model_path,
         seed=evaluation_seed,
         return_daily=True,
-        fixed_actions=True,
+        fixed_actions=False,
     )
     actions_dir = artifact_dir(run_dir, "actions")
     actions_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +247,7 @@ def evaluate_dqn_with_actions(
     provenance = {
         "market": market,
         "train_year": year,
-        "evaluation_mode": "seeded_epsilon_greedy",
+        "evaluation_mode": "deterministic_greedy_online_updates",
         "evaluation_seed": evaluation_seed,
         "ranking": str(ranking),
         "ranking_sha256": sha256(ranking),
@@ -345,12 +400,12 @@ def main() -> None:
     if "T4" in tables:
         run_table4(
             records, run_dir, markets, args.include_baselines, seed_config, args.seed,
-            args.dqn_eval_mode == "fixed",
+            False,
         )
     if "T5" in tables:
         run_table5(
             records, run_dir, markets, args.include_baselines, seed_config, args.seed,
-            args.dqn_eval_mode == "fixed",
+            False,
         )
     if "T7" in tables:
         run_table7(records, run_dir, markets, seed_config, args.seed)

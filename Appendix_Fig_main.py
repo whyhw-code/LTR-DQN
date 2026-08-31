@@ -29,6 +29,7 @@ import pandas as pd
 from experiment_core import (
     CODE_DIR,
     DATA_DIR,
+    DQN_RANKER,
     FEES,
     MARKETS,
     STAMP_TAX,
@@ -254,7 +255,11 @@ def backtest(
             selected = group.nlargest(min(4, len(group)), "prediction")
         elif selection == "actions":
             top_n = int((actions or {}).get(int(date), 0))
-            selected = group.iloc[0:0] if top_n <= 0 else group.nlargest(min(top_n, len(group)), "prediction")
+            selected = (
+                group.iloc[0:0]
+                if top_n <= 0
+                else group.nlargest(min(top_n, len(group)), "prediction")
+            )
         else:
             raise ValueError(f"Unknown selection mode: {selection}")
         before = capital
@@ -298,8 +303,8 @@ def load_actions(run_dir: Path, market: str) -> tuple[dict[int, int], Path]:
 
 def dqn_ranking_path(run_dir: Path, market: str) -> Path:
     return require_file(
-        artifact_dir(run_dir, "rankings") / f"{market}_LambdaRank_test3.csv",
-        f"{market} LambdaRank test ranking used by DQN",
+        artifact_dir(run_dir, "rankings") / f"{market}_{DQN_RANKER}_test3.csv",
+        f"{market} {DQN_RANKER} test ranking used by DQN",
     )
 
 
@@ -696,7 +701,7 @@ def main() -> None:
     notes = {
         "C1": "Long-horizon index and all-report baseline portfolio curves.",
         "C2": "Uses a true brokerage identifier when supplied; otherwise broker_size is an explicitly labelled proxy.",
-        "C3": "Current DQN daily stock counts and current LambdaRank ranking, re-backtested under four fee settings.",
+        "C3": "Current DQN daily stock counts and current LambdaMART ranking, re-backtested under four fee settings.",
         "C4": "Uses the fixed 500-seed-per-cell T6 selected-result ledger.",
         "C5": "Current DQN daily stock counts applied to the supplied ESG ranking data.",
     }

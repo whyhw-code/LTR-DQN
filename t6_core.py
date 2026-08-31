@@ -179,7 +179,7 @@ def make_ranker(market: str, model_name: str, seed: int, tree_method: str) -> xg
             tree_method=tree_method, lambdarank_num_pair_per_sample=8,
             booster="gbtree", eval_metric="ndcg", objective="rank:pairwise",
             learning_rate=cfg["rank_learning_rate"], lambdarank_pair_method="topk",
-            random_state=seed,
+            random_state=seed, n_jobs=1,
         )
     if model_name == "LambdaMART":
         return xgb.XGBRanker(
@@ -187,6 +187,7 @@ def make_ranker(market: str, model_name: str, seed: int, tree_method: str) -> xg
             booster="gbtree", eval_metric="ndcg", objective=cfg["mart_objective"],
             learning_rate=cfg["mart_learning_rate"], max_depth=cfg["mart_depth"],
             n_estimators=1000, lambdarank_pair_method="topk", random_state=seed,
+            n_jobs=1,
         )
     raise ValueError(f"Unknown T6 model: {model_name}")
 

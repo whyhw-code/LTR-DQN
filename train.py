@@ -74,9 +74,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--n_games", type=int, default=31)
     parser.add_argument("--lr", type=float, default=0.002)
+    parser.add_argument("--gamma", type=float, default=0.9)
+    parser.add_argument("--epsilon", type=float, default=1.0)
+    parser.add_argument("--eps_end", type=float, default=0.03)
+    parser.add_argument("--eps_dec", type=float, default=0.00015)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--max_mem_size", type=int, default=100)
+    parser.add_argument("--replace_target_iter", type=int, default=8)
     parser.add_argument(
         "--ranker_tree_method", choices=["auto", "hist", "exact", "approx", "gpu_hist"], default="auto",
-        help="Ranker tree builder; auto uses exact only for ChiNext LambdaMART and hist otherwise",
+        help="Ranker tree builder; auto preserves the original gpu_hist path",
     )
     parser.add_argument(
         "--t6", action="store_true",
@@ -89,10 +96,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--t6_max_seeds", type=int, default=None,
         help="Optional smoke-test limit per T6 cell; omit for all seeds",
-    )
-    parser.add_argument(
-        "--t6_select_map", type=Path, default=None,
-        help="Frozen T6 daily action map (columns 60 and 3068)",
     )
     parser.add_argument(
         "--t6_seed_summary", type=Path, default=None,
@@ -177,7 +180,13 @@ def main() -> None:
     selected = {item.strip().lower() for item in args.models.split(",")}
     train_rankers = "all" in selected or "rankers" in selected
     train_dqns = "all" in selected or "dqn" in selected
+    if train_dqns and not train_rankers:
+        raise ValueError(
+            "DQN training requires fresh LambdaMART training in the same invocation. "
+            "Use --models all (or --models rankers,dqn); stale ranking files are not accepted."
+        )
     ranker_tree_method = None if args.ranker_tree_method == "auto" else args.ranker_tree_method
+    effective_tree_method = "gpu_hist" if ranker_tree_method is None else ranker_tree_method
     manifest_path = (
         CODE_DIR / "temp" / "train_manifest.json"
         if run_dir == CODE_DIR.resolve()
@@ -203,7 +212,15 @@ def main() -> None:
         "rank_config": str(args.rank_config.resolve()) if args.rank_config else "built-in",
         "n_games": args.n_games,
         "lr": args.lr,
+        "gamma": args.gamma,
+        "epsilon": args.epsilon,
+        "eps_end": args.eps_end,
+        "eps_dec": args.eps_dec,
+        "batch_size": args.batch_size,
+        "max_mem_size": args.max_mem_size,
+        "replace_target_iter": args.replace_target_iter,
         "ranker_tree_method": args.ranker_tree_method,
+        "effective_ranker_tree_method": effective_tree_method,
     })
 
     for market in args.markets:
@@ -236,7 +253,7 @@ def main() -> None:
                         "train_year": year,
                         "model": model_name,
                         "seed": model_seed,
-                        "tree_method": "auto" if ranker_tree_method is None else ranker_tree_method,
+                        "tree_method": effective_tree_method,
                         "paper_parameters": PAPER_HYPERPARAMETERS[model_name][MARKETS[market]],
                         "source_entrypoint_parameters": (
                             T4_MART_HYPERPARAMETERS[MARKETS[market]]
@@ -269,6 +286,13 @@ def main() -> None:
                     lr=args.lr,
                     n_games=args.n_games,
                     seed=dqn_seed,
+                    gamma=args.gamma,
+                    epsilon=args.epsilon,
+                    eps_end=args.eps_end,
+                    eps_dec=args.eps_dec,
+                    batch_size=args.batch_size,
+                    max_mem_size=args.max_mem_size,
+                    replace_target_iter=args.replace_target_iter,
                 )
                 record = {
                     "market": market,
@@ -280,6 +304,13 @@ def main() -> None:
                     "model": str(model_path),
                     "sha256": sha256(model_path),
                     "model_state_sha256": state_hash,
+                    "gamma": args.gamma,
+                    "epsilon": args.epsilon,
+                    "eps_end": args.eps_end,
+                    "eps_dec": args.eps_dec,
+                    "batch_size": args.batch_size,
+                    "max_mem_size": args.max_mem_size,
+                    "replace_target_iter": args.replace_target_iter,
                 }
                 upsert(manifest["dqn"], record, ("market", "train_year"))
 
@@ -312,20 +343,24 @@ def main() -> None:
                 f"T6 DQN seed summary not found: {dqn_seed_path}. "
                 "Run make_dqn_seed_summary.py first."
             )
-        select_path = args.t6_select_map or generate_t6_select_map(
+        # Always regenerate the action map from the freshly trained DQN.  A
+        # checked-in or user-supplied map would be an intermediate-result
+        # shortcut and is intentionally not part of the reproduction API.
+        select_path = generate_t6_select_map(
             run_dir, t6_markets, seed_config, args.seed
         )
         if not select_path.is_file():
             raise FileNotFoundError(
-                f"T6 daily action map not found: {select_path}. "
-                "Provide --t6_select_map with the frozen meiri_xuanze.csv file."
+                f"T6 daily action map was not generated: {select_path}"
             )
         t6_output = CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv" if run_dir == CODE_DIR.resolve() else run_dir / "t6_runs" / "t6_raw.csv"
         raw = run_sampling(
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
             markets=t6_markets, max_seeds=args.t6_max_seeds,
-            use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=True,
+            # Recompute every cell from the raw data on each invocation.  A
+            # prior t6_raw.csv is never used as a shortcut.
+            use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=False,
             dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
         )
         t6_manifest = {
@@ -342,7 +377,7 @@ def main() -> None:
             "raw_csv_sha256": sha256(t6_output),
             "rows": len(raw),
             "sampling_rates": ["100%", "50%", "60%", "70%", "80%", "90%"],
-            "resume": True,
+            "resume": False,
         }
         t6_manifest_path = t6_output.with_name("t6_manifest.json")
         t6_manifest_path.write_text(
