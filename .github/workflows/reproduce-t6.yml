@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: ${{ vars.GPU_RUNNER_LABEL }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 720
     env:
       MPLBACKEND: Agg
@@ -29,11 +29,11 @@ jobs:
           python -m pip check
           python -c "from model import validate_runtime; validate_runtime()"
       - name: Train three-year models
-        run: python train.py --models all --years 3 --ranker_tree_method gpu_hist
+        run: python train.py --models all --years 3 --ranker_tree_method hist
       - name: Export T4 baseline reused by T6 100 percent row
         run: python main.py --tables T4 --no_baselines --export_csvs
       - name: Sample T6
-        run: python train.py --models all --years 3 --t6 --ranker_tree_method gpu_hist --t6_require_gpu
+        run: python train.py --models all --years 3 --t6 --ranker_tree_method hist
       - name: Export T6 workbook and Figure C4
         run: |
           python T6_main.py

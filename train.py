@@ -82,8 +82,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_mem_size", type=int, default=100)
     parser.add_argument("--replace_target_iter", type=int, default=8)
     parser.add_argument(
-        "--ranker_tree_method", choices=["auto", "hist", "exact", "approx", "gpu_hist"], default="auto",
-        help="Ranker tree builder; auto preserves the original gpu_hist path",
+        "--ranker_tree_method", choices=["hist", "exact", "approx"], default="hist",
+        help="Ranker tree builder; defaults to the CPU hist implementation",
     )
     parser.add_argument(
         "--t6", action="store_true",

@@ -1,4 +1,4 @@
-name: Reproduce Core
+name: Reproduce Core (CPU)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: ${{ vars.GPU_RUNNER_LABEL }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 360
     env:
       MPLBACKEND: Agg
@@ -28,12 +28,12 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
           python -c "from model import validate_runtime; validate_runtime()"
-      - name: Train rankers and DQN models
-        run: python train.py
+      - name: Train rankers and DQN models on CPU
+        run: python train.py --ranker_tree_method hist
       - name: Export tables
         run: python main.py --export_csvs
       - name: Generate main-text figures
-        run: python Fig_main.py --ranker_tree_method auto --force
+        run: python Fig_main.py --ranker_tree_method hist --force
       - name: Generate appendix figures except C4
         run: python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
       - uses: actions/upload-artifact@v4

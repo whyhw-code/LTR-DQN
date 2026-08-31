@@ -32,10 +32,9 @@ workspace runtime is Python 3.9.13), especially:
 - pandas 1.4.4
 - scikit-learn 1.2.0
 
-LambdaRank and LambdaMART retain their paper parameters and original default
-`gpu_hist` training path, with an explicit seed and `n_jobs=1`.  CPU-only
-machines can pass `--ranker_tree_method hist`.  The DQN always consumes the
-LambdaMART rankings produced by that same fresh run.
+LambdaRank and LambdaMART retain their paper parameters and use the CPU
+`hist` training path by default, with an explicit seed and `n_jobs=1`.  The
+DQN always consumes the LambdaMART rankings produced by that same fresh run.
 
 Start each process with a fixed Python hash seed as well:
 
