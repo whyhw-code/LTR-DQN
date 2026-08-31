@@ -107,7 +107,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--t6_require_gpu", action="store_true",
-        help="Require XGBoost gpu_hist for T6; fail instead of falling back to hist",
+        help="Deprecated compatibility flag; CPU T6 is used regardless",
     )
     return parser.parse_args()
 
@@ -185,8 +185,8 @@ def main() -> None:
             "DQN training requires fresh LambdaMART training in the same invocation. "
             "Use --models all (or --models rankers,dqn); stale ranking files are not accepted."
         )
-    ranker_tree_method = None if args.ranker_tree_method == "auto" else args.ranker_tree_method
-    effective_tree_method = "gpu_hist" if ranker_tree_method is None else ranker_tree_method
+    ranker_tree_method = args.ranker_tree_method
+    effective_tree_method = ranker_tree_method
     manifest_path = (
         CODE_DIR / "temp" / "train_manifest.json"
         if run_dir == CODE_DIR.resolve()
@@ -360,7 +360,7 @@ def main() -> None:
             markets=t6_markets, max_seeds=args.t6_max_seeds,
             # Recompute every cell from the raw data on each invocation.  A
             # prior t6_raw.csv is never used as a shortcut.
-            use_gpu=args.ranker_tree_method in {"auto", "gpu_hist"}, resume=False,
+            use_gpu=False, resume=False,
             dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
         )
         t6_manifest = {
