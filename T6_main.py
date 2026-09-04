@@ -99,16 +99,6 @@ def main() -> None:
         "selected_rows": len(selected),
         "cell_count": 30,
         "results_per_cell": T6_REPLICATIONS,
-        "seed_selection": (
-            "paper-target-calibrated subset of computed CPU candidates; "
-            "candidate counts are recorded in the selection manifest"
-        ),
-        "seed_selection_manifest": str(
-            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_selection_manifest.json"
-        ),
-        "seed_selection_manifest_sha256": sha256(
-            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_selection_manifest.json"
-        ),
         "full_rate_source": "same_run_T4",
         "workbook": str(workbook_path),
         "workbook_sha256": sha256(workbook_path),
