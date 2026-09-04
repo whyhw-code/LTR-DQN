@@ -1,159 +1,204 @@
-# Deterministic T3/T4/T5/T6/T7 Reproduction
+# LTR-DQN Reproduction (CPU)
 
-This directory is the clean reproduction workflow. It starts from source data,
-trains fresh LambdaRank, LambdaMART and DQN models, and exports the paper-format
-T3/T4/T5/T7 tables. The separate T6 sampling experiment reuses the original
-Mbox/Cbox sampling logic and records every seed before summarizing the paper's
-Mean/Std rows.
+This repository reproduces the paper tables T3, T4, T5, T6 and T7, the main-text
+figures, and Appendix Figures C1-C5. Every run starts from the tracked source
+data and trains fresh rankers and DQN models. No fitted model, result workbook,
+daily action file, or historical `meiri_xuanze` selection file is required.
 
-## Clean initial layout
+## Repository layout
 
-- `data/`: source data only; training never modifies these files.
-- `temp/`: generated LambdaRank/LambdaMART rankings, action CSVs and manifests.
-  No fitted ranking or policy artifact is required as an input to a fresh run.
-- `model/`: initially empty; fresh DQN checkpoints are generated here.
-- `results/`: created by `main.py`; contains the final workbook and CSVs.
-- `train.py`: all long-running LambdaRank, LambdaMART and DQN training.
-- `main.py`: baseline fitting, model testing and T3/T4/T5/T7 multi-sheet export.
-- `T6_main.py`: T6 workbook export plus the sampling and backtest implementation.
-- `experiment_core.py`: shared ranker, baseline, DQN, backtest and workbook implementation.
-- `runtime_config.py`: locked versions, seeds and deterministic CPU settings.
+### Entry points
 
-The historical `batch123` rankings, checkpoints and daily action CSVs are not
-required by the default workflow.
+- `train.py`: long-running training. Fits LambdaRank and LambdaMART, then trains
+  LTR-DQN from the fresh LambdaMART ranking. With `--t6`, it also runs the
+  20-replication sampling experiment.
+- `main.py`: evaluates the trained artifacts, fits the short baseline models,
+  regenerates DQN actions, and writes Results tables T3/T4/T5/T7.
+- `T6_main.py`: validates the fresh T6 raw CSV and writes the T6 workbook. It
+  also contains the sampling and backtest implementation used by `train.py`.
+- `Fig_main.py`: recomputes and writes main-text Figures 3-7 and their audit
+  CSVs from the current run.
+- `Appendix_Fig_main.py`: recomputes and writes Appendix Figures C1-C5 and
+  their audit CSVs. Figure C4 consumes the fresh T6 raw CSV.
 
-## Locked environment
+### Shared implementation
 
-Use Python 3.9.x and the versions in `requirements-lock.txt` (the verified
-workspace runtime is Python 3.9.13), especially:
+- `experiment_core.py`: shared data loading, LambdaRank/LambdaMART fitting,
+  baseline fitting, DQN environment and agent, backtesting, metrics, table
+  formatting, manifests, and hashes.
+- `runtime_config.py`: Python/package lock values, independent stage seeds, and
+  deterministic single-CPU settings. The default DQN device is CPU.
 
-- XGBoost 1.7.6
-- PyTorch 2.0.0+cu117
-- NumPy 1.21.5
-- pandas 1.4.4
-- scikit-learn 1.2.0
+### Data and automation
 
-LambdaRank and LambdaMART retain their paper parameters and use the verified
-single-CPU `approx` training path with an explicit seed and `n_jobs=1`. The DQN
-always consumes the raw LambdaMART predictions produced by that same fresh run.
+- `data/0060merge_open_close_final.csv` and `data/3068merge_open_close_final.csv`:
+  stock features and open/close prices used for training and evaluation.
+- `data/0060merge_T4.csv` and `data/3068merge_T4.csv`: index/reference series
+  used by the paper tables.
+- `data/0060merge.csv` and `data/3068merge.csv`: market data used by baselines,
+  figures, and T6 backtests.
+- `data/dapan/`: broad-market data used by the baseline and DQN backtest paths.
+- `data/ESG/`: supplied ESG ranking inputs used by T7 and Appendix C5.
+- `data/reproducibility/`: the two 20-seed T6 configuration ledgers. They store
+  only the seeds used by the run, not fitted outputs or selection manifests.
+- `.github/workflows/reproduce-core.yml`: GitHub Actions workflow for training,
+  Results, and main figures.
+- `.github/workflows/reproduce-t6.yml`: GitHub Actions workflow for T6 and
+  Appendix Figure C4.
 
-Start each process with a fixed Python hash seed as well:
+### Environment and housekeeping
+
+- `requirements-lock.txt`: exact pip lock for the CPU reproduction, including
+  `torch==2.0.0+cpu`.
+- `requirements.txt`: standard pip dependency list used by the GitHub workflow.
+- `environment.yml`: Conda environment definition for Python 3.9.13 and the
+  CPU package set.
+- `.gitignore`: excludes generated `results/`, `temp/`, `model/`, `runs/`, and
+  Python caches from commits.
+- `README.md`: this guide.
+
+Generated directories are created only after a run:
+
+```text
+temp/       fresh rankings, DQN actions, and manifests
+model/      fresh DQN checkpoints
+runs/       optional self-contained run artifacts
+results/    workbooks, paper CSVs, figure PNGs, and audit CSVs
+```
+
+## Requirements
+
+- Python 3.9.13, 64-bit x86 (`x64`).
+- Windows 10/11 or Linux x86_64. GitHub Actions uses Ubuntu 22.04 x64.
+- CPU only. GPU is not required and is not selected by the default code path.
+- One compute thread is enforced for BLAS, XGBoost, and PyTorch to reduce
+  cross-machine variation. More CPU cores may improve operating-system
+  scheduling overhead only; they do not change the configured algorithm.
+- At least 8 GB RAM and 10 GB free disk space are recommended for the full
+  all-years run, because the training and figure steps create temporary files.
+
+Important pinned versions include NumPy 1.21.5, pandas 1.4.4, scikit-learn
+1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. The entry points check the locked
+runtime before fitting and stop on a mismatch.
+
+## Installation
+
+### Windows PowerShell
 
 ```powershell
+git clone https://github.com/whyhw-code/LTR-DQN.git
+Set-Location LTR-DQN
+py -3.9 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
 ```
 
-On Linux, use `export PYTHONHASHSEED=0` before running the same commands.
-
-From this directory, verify the important versions and selected device with:
-
-```powershell
-python -c "import torch,xgboost,numpy,pandas; print(torch.__version__, xgboost.__version__, numpy.__version__, pandas.__version__, torch.get_num_threads())"
-```
-
-Every entry point performs the same locked-version check before fitting.  If a
-reviewer has a package mismatch, the command stops with the exact versions that
-must be corrected instead of silently producing a non-comparable table.  Small
-OS-level floating-point differences are recorded in the manifest and can be
-treated as numerical tolerance, not as a different algorithm.  The Docker
-image below is available when a common Linux userspace is preferred.
-
-Build and run the same image on Linux or Docker Desktop (PowerShell):
+### Linux Bash
 
 ```bash
-docker build -f Dockerfile.repro -t ltr-dqn-repro:py3913 .
-docker run --rm -v "$PWD:/workspace" -w /workspace ltr-dqn-repro:py3913 train.py --models all --years 3 --ranker_tree_method hist
-docker run --rm -v "$PWD:/workspace" -w /workspace ltr-dqn-repro:py3913 main.py --export_csvs
+git clone https://github.com/whyhw-code/LTR-DQN.git
+cd LTR-DQN
+python3.9 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-lock.txt
+export PYTHONHASHSEED=0
 ```
 
-```powershell
-docker build -f Dockerfile.repro -t ltr-dqn-repro:py3913 .
-docker run --rm -v "${PWD}:/workspace" -w /workspace ltr-dqn-repro:py3913 train.py --models all --years 3 --ranker_tree_method hist
-docker run --rm -v "${PWD}:/workspace" -w /workspace ltr-dqn-repro:py3913 main.py --export_csvs
+The Conda alternative is:
+
+```bash
+conda env create -f environment.yml
+conda activate ltr-dqn
 ```
 
-## Complete workflow
+Verify the installation before a long run:
 
-Run the complete fresh training process. No seed argument is required because
-the market/year/stage seed map is locked in `runtime_config.py`:
-
-```powershell
-python train.py
+```bash
+python -c "import sys,torch,xgboost,numpy,pandas,sklearn; print(sys.version); print(torch.__version__, xgboost.__version__, numpy.__version__, pandas.__version__, sklearn.__version__, torch.get_num_threads()); print(torch.cuda.is_available())"
+python -m compileall -q *.py
 ```
 
-This command refits both ranking models from `data/` and then trains DQN from
-the newly written LambdaMART rankings.  It never accepts a precomputed MART
-ranking as an input.
+The last line should print `False` for CUDA availability and the thread count
+should be `1`.
 
-Then fit the fast baselines, test every fresh model, regenerate the DQN daily
-actions and export T3/T4/T5/T7:
+## Complete local reproduction
 
-```powershell
+Run these commands from the repository root, in order.
+
+### 1. Train all primary models
+
+```bash
+python train.py --models all --years 2,3,4 --ranker_tree_method approx
+```
+
+This refits LambdaRank and LambdaMART from `data/`, then trains DQN from the
+new LambdaMART rankings. It does not read a precomputed ranking or a fixed
+daily selection file.
+
+### 2. Export Results tables
+
+```bash
 python main.py --export_csvs
 ```
 
-The final workbook is:
+Main output: `results/combined/results.xlsx`, containing T3, T4, T5 and T7.
+Paper-format CSVs and JSON manifests are written beside the workbook.
 
-```text
-results/combined/results.xlsx
+### 3. Generate main-text figures
+
+```bash
+python Fig_main.py --ranker_tree_method approx --force
 ```
 
-It contains one sheet each for T3, T4, T5 and T7. The same directory also
-contains one paper-format CSV per table, `results_long.csv` and
-`main_manifest.json`.
+Output: `results/figures/`.
 
-## Table 6 sampling workflow
+### 4. Generate Appendix Figures C1, C2, C3 and C5
 
-The default CPU reproduction uses 20 fixed seeds per sampling cell. The seed
-tables are configuration only; they are not fitted model outputs:
-
-- `data/reproducibility/t6_cpu20_seed_summary.csv`: ranker/MART seeds.
-- `data/reproducibility/t6_cpu20_dqn_seed_summary.csv`: DQN seeds.
-
-Run the sampling experiment from raw data (it intentionally does not resume a
-previous `t6_raw.csv`):
-
-```powershell
-python train.py --models all --years 3 --t6
+```bash
+python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
 ```
 
-Then export the workbook from that fresh raw sampling output:
+Output: `results/appendix_figures/`.
 
-```powershell
+### 5. Run T6 separately
+
+T6 is a separate 20-seed sampling experiment. Run:
+
+```bash
+python train.py --models all --years 3 --t6 --ranker_tree_method approx
 python T6_main.py
+python Appendix_Fig_main.py --figures C4 --force
 ```
 
-The 100% column is copied from the same run's freshly evaluated T4 primary
-models; T6 does not fit a separate no-sampling ranker for that column.
+Outputs are `results/T6/T6.xlsx` and Appendix Figure C4. The 100% T6 column
+comes from the same run's freshly evaluated T4 models; no result is copied from
+an external intermediate file.
 
-The paper-format output is `results/T6/T6.xlsx`; it contains the
-`T6_sampling` sheet. `T6_selected_raw.csv`, `T6_results_long.csv`,
-`T6_summary.csv` and `T6_manifest.json` provide the audit trail. No manuscript
-result is injected.
+## GitHub Actions reproduction
 
-## Reproducibility contract
+1. Open the repository's **Actions** tab.
+2. Select **Reproduce Core (CPU)** and choose **Run workflow** for Results and
+   main figures.
+3. Select **Reproduce T6** and choose **Run workflow** for T6 and Appendix C4.
+4. Open the completed run and download its artifact. The artifact contains the
+   generated workbook, CSVs, figures, and manifests.
 
-- Paper-reported hyperparameters and the original DQN training/evaluation
-  behavior are unchanged.
-- Python, NumPy and PyTorch deterministic settings are enabled before every
-  stochastic stage.
-- Independent fixed seeds are used for each market, training window and stage.
-- LambdaRank and LambdaMART are refit from the source files on every run.
-- DQN always consumes the LambdaMART CSV generated by that same fresh run;
-  LambdaRank remains an independent ranking-only baseline.
-- Default testing uses the trained DQN and regenerates seeded epsilon-greedy
-  actions. It does not replay historical daily-action files.
-- `train_manifest.json` stores seeds and hashes for rankings/checkpoints;
-  `main_manifest.json` stores hashes for generated action files.
+Both workflows use an x64 Ubuntu 22.04 CPU runner, Python 3.9.13, a fixed hash
+seed, and single-thread settings. They do not require or request a GPU runner.
 
-Use the same locked package versions, source data, seed map and single-thread
-runtime on every machine.  A Dockerfile is provided for a common Linux
-userspace; it does not contain data, rankings, checkpoints or results.  An
-identical result across unrelated operating systems is not mathematically
-guaranteed by XGBoost/PyTorch, so manifests record hashes to expose any
-remaining platform-level difference rather than hiding it with a copied
-intermediate file.
+## Reproducibility notes
 
-Changing `--seed`, `--seed_config`,
-`--rank_config`, `--lr`, `--n_games` or `--ranker_tree_method` creates a
-different experiment and is outside the default reproduction command.
+- The default seed map is in `runtime_config.py`; the T6 seed ledgers are under
+  `data/reproducibility/`.
+- `LambdaRank` and `LambdaMART` are retrained from the raw tracked data on each
+  run. DQN consumes the LambdaMART output created by that same run.
+- `PYTHONHASHSEED=0`, fixed seeds, deterministic PyTorch settings, stable CSV
+  ordering, and `n_jobs=1` are enabled to reduce platform variation.
+- Manifests record runtime versions, input hashes, action hashes, and checkpoint
+  hashes. Exact byte-for-byte equality across unrelated operating systems is
+  not guaranteed by XGBoost/PyTorch; a mismatch is visible in the manifests.
+- Do not change `--seed`, `--seed_config`, `--lr`, `--n_games`, or
+  `--ranker_tree_method` when reproducing the reported default run.
