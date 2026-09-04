@@ -2,6 +2,8 @@
 
 [English](README.md) | 简体中文
 
+**[新 GitHub 账号一键复现指南](GITHUB_ACTIONS_GUIDE_CN.md)**：从 Fork 本仓库、启用 Actions、运行 Results/T6，到下载表格和图片的完整操作步骤。
+
 本仓库用于从原始数据复现论文中的 T3、T4、T5、T6、T7 表格、正文图和附录图 C1-C5。每次运行都会重新训练排序模型和 DQN，不依赖已生成的结果、中间模型、每日选择文件或历史 `meiri_xuanze` 文件。
 
 ## 文件结构
