@@ -1,5 +1,7 @@
 # LTR-DQN Reproduction (CPU)
 
+English | [简体中文](README_CN.md)
+
 This repository reproduces the paper tables T3, T4, T5, T6 and T7, the main-text
 figures, and Appendix Figures C1-C5. Every run starts from the tracked source
 data and trains fresh rankers and DQN models. No fitted model, result workbook,

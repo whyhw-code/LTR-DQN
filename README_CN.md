@@ -1,5 +1,7 @@
 # LTR-DQN 复现说明（CPU 版）
 
+[English](README.md) | 简体中文
+
 本仓库用于从原始数据复现论文中的 T3、T4、T5、T6、T7 表格、正文图和附录图 C1-C5。每次运行都会重新训练排序模型和 DQN，不依赖已生成的结果、中间模型、每日选择文件或历史 `meiri_xuanze` 文件。
 
 ## 文件结构
@@ -153,7 +155,7 @@ python Appendix_Fig_main.py --figures C4 --force
 
 ## 复现注意事项
 
-- 默认种子图在 `runtime_config.py`，T6 种子表在 `data/reproducibility/`。
+- 默认种子映射在 `runtime_config.py`，T6 种子表在 `data/reproducibility/`。
 - LambdaRank、LambdaMART 每次都从原始数据重新训练；DQN 使用同一次运行产生的 LambdaMART 输出。
 - `PYTHONHASHSEED=0`、固定种子、PyTorch 确定性设置、稳定 CSV 排序和 `n_jobs=1` 用于减少平台差异。
 - 运行清单记录依赖版本、输入哈希、动作哈希和检查点哈希。不同操作系统之间不保证字节级完全相同，差异会在清单中显示。
