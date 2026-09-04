@@ -1,4 +1,4 @@
-name: Reproduce Core (CPU)
+name: 1 - Results and Figures (CPU)
 
 on:
   workflow_dispatch:
@@ -15,34 +15,45 @@ jobs:
       PYTHONHASHSEED: "0"
     steps:
       - uses: actions/checkout@v4
+        with:
+          clean: true
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: 3.9.13
           architecture: x64
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: requirements-lock.txt
+      - name: Verify fresh source-only checkout
+        shell: bash
+        run: |
+          test ! -e results
+          test ! -e temp
+          test ! -e model
+          test ! -e runs
       - name: Install locked environment
-        shell: pwsh
+        shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-lock.txt
           python -m pip check
-          python -c "from model import validate_runtime; validate_runtime()"
-      - name: Train rankers and DQN models on CPU
-        run: python train.py --ranker_tree_method hist
-      - name: Export tables
+          python -c "from experiment_core import validate_runtime; validate_runtime()"
+      - name: Train all models from tracked source data
+        run: python train.py --models all --years 2,3,4 --ranker_tree_method approx
+      - name: Export T3, T4, T5 and T7 tables
         run: python main.py --export_csvs
-      - name: Generate main-text figures
-        run: python Fig_main.py --ranker_tree_method hist --force
-      - name: Generate appendix figures except C4
+      - name: Generate all main-text figures
+        run: python Fig_main.py --ranker_tree_method approx --force
+      - name: Generate Appendix Figures C1, C2, C3 and C5
         run: python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload final tables, figures and manifests
+        uses: actions/upload-artifact@v4
         with:
-          name: ltr-dqn-core-${{ github.run_id }}
+          name: ltr-dqn-results-and-figures-${{ github.run_id }}
           path: |
-            results/
-            runs/
+            results/combined/
+            results/figures/
+            results/appendix_figures/
             temp/train_manifest.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14

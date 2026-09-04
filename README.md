@@ -43,16 +43,15 @@ daily action file, or historical `meiri_xuanze` selection file is required.
 - `data/ESG/`: supplied ESG ranking inputs used by T7 and Appendix C5.
 - `data/reproducibility/`: the two 20-seed T6 configuration ledgers. They store
   only the seeds used by the run, not fitted outputs or selection manifests.
-- `.github/workflows/reproduce-core.yml`: GitHub Actions workflow for training,
-  Results, and main figures.
-- `.github/workflows/reproduce-t6.yml`: GitHub Actions workflow for T6 and
-  Appendix Figure C4.
+- `.github/workflows/reproduce-core.yml`: clean source-data workflow for
+  Results, all main figures, and Appendix Figures C1/C2/C3/C5.
+- `.github/workflows/reproduce-t6.yml`: separate clean source-data workflow for
+  T6 and Appendix Figure C4.
 
 ### Environment and housekeeping
 
 - `requirements-lock.txt`: exact pip lock for the CPU reproduction, including
   `torch==2.0.0+cpu`.
-- `requirements.txt`: standard pip dependency list used by the GitHub workflow.
 - `environment.yml`: Conda environment definition for Python 3.9.13 and the
   CPU package set.
 - `.gitignore`: excludes generated `results/`, `temp/`, `model/`, `runs/`, and
@@ -183,14 +182,17 @@ an external intermediate file.
 ## GitHub Actions reproduction
 
 1. Open the repository's **Actions** tab.
-2. Select **Reproduce Core (CPU)** and choose **Run workflow** for Results and
-   main figures.
-3. Select **Reproduce T6** and choose **Run workflow** for T6 and Appendix C4.
+2. Select **1 - Results and Figures (CPU)** and choose **Run workflow** for
+   T3/T4/T5/T7, all main figures, and Appendix C1/C2/C3/C5.
+3. Select **2 - T6 and Figure C4 (CPU)** and choose **Run workflow** for T6 and
+   Appendix C4.
 4. Open the completed run and download its artifact. The artifact contains the
    generated workbook, CSVs, figures, and manifests.
 
 Both workflows use an x64 Ubuntu 22.04 CPU runner, Python 3.9.13, a fixed hash
-seed, and single-thread settings. They do not require or request a GPU runner.
+seed, and single-thread settings. The runner is fixed in the workflow, so there
+is no runner choice to make when starting a run. They do not require or request
+a GPU runner.
 
 ## Reproducibility notes
 

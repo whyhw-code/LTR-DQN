@@ -27,13 +27,12 @@
 - `data/dapan/`：基线和 DQN 回测使用的大盘数据。
 - `data/ESG/`：T7 和附录 C5 使用的 ESG 排序输入。
 - `data/reproducibility/`：T6 使用的两张 20-seed 配置表，只记录运行所需种子，不保存拟合结果或固定选择结果。
-- `.github/workflows/reproduce-core.yml`：Results 和正文图的 GitHub Actions。
-- `.github/workflows/reproduce-t6.yml`：T6 和附录 C4 的 GitHub Actions。
+- `.github/workflows/reproduce-core.yml`：从干净原始数据生成 Results、全部正文图和附录 C1/C2/C3/C5。
+- `.github/workflows/reproduce-t6.yml`：单独从干净原始数据生成 T6 和附录 C4。
 
 ### 环境文件
 
 - `requirements-lock.txt`：CPU 复现使用的精确 pip 依赖锁定文件，包括 `torch==2.0.0+cpu`。
-- `requirements.txt`：GitHub workflow 使用的标准 pip 依赖列表。
 - `environment.yml`：Python 3.9.13 的 Conda 环境定义。
 - `.gitignore`：排除运行生成的 `results/`、`temp/`、`model/`、`runs/` 和 Python 缓存。
 
@@ -147,11 +146,11 @@ python Appendix_Fig_main.py --figures C4 --force
 ## GitHub Actions 在线复现
 
 1. 打开仓库的 **Actions** 页面。
-2. 选择 **Reproduce Core (CPU)**，点击 **Run workflow**，生成 Results 和正文图。
-3. 选择 **Reproduce T6**，点击 **Run workflow**，生成 T6 和附录 C4。
+2. 选择 **1 - Results and Figures (CPU)**，点击 **Run workflow**，生成 T3/T4/T5/T7、全部正文图和附录 C1/C2/C3/C5。
+3. 选择 **2 - T6 and Figure C4 (CPU)**，点击 **Run workflow**，生成 T6 和附录 C4。
 4. 运行结束后下载 artifact，其中包含工作簿、CSV、图片和运行清单。
 
-两个 workflow 都使用 Ubuntu 22.04 x64 CPU、Python 3.9.13、固定 hash seed 和单线程设置，不需要 GPU runner。
+两个 workflow 都固定使用 Ubuntu 22.04 x64 CPU、Python 3.9.13、固定 hash seed 和单线程设置。启动时不需要选择 runner，也不需要 GPU runner。
 
 ## 复现注意事项
 
