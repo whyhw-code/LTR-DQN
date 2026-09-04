@@ -15,8 +15,9 @@ Mean/Std rows.
 - `results/`: created by `main.py`; contains the final workbook and CSVs.
 - `train.py`: all long-running LambdaRank, LambdaMART and DQN training.
 - `main.py`: baseline fitting, model testing and T3/T4/T5/T7 multi-sheet export.
-- `T6_main.py`: T6 workbook export from the fresh raw sampling output.
-- `t6_core.py`: consolidated Appendix Mbox/Cbox sampling and backtest logic.
+- `T6_main.py`: T6 workbook export plus the sampling and backtest implementation.
+- `experiment_core.py`: shared ranker, baseline, DQN, backtest and workbook implementation.
+- `runtime_config.py`: locked versions, seeds and deterministic CPU settings.
 
 The historical `batch123` rankings, checkpoints and daily action CSVs are not
 required by the default workflow.

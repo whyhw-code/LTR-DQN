@@ -45,7 +45,7 @@ from experiment_core import (
     validate_runtime,
 )
 from runtime_config import load_stage_seed_config, stage_seed
-from workflow import baseline_ranking
+from main import baseline_ranking
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -188,7 +188,6 @@ def implementation_paths() -> list[Path]:
     return [
         CODE_DIR / "Fig_main.py",
         CODE_DIR / "experiment_core.py",
-        CODE_DIR / "dl_dqn2.py",
         CODE_DIR / "runtime_config.py",
     ]
 

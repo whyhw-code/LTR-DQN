@@ -40,7 +40,7 @@ from experiment_core import (
     sha256,
     validate_runtime,
 )
-from t6_core import T6_REPLICATIONS
+from T6_main import T6_REPLICATIONS
 
 
 MARKET_ORDER = ("Main", "ChiNext")

@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-from model import (
+from experiment_core import (
     CODE_DIR,
     artifact_dir,
     canonicalize_ranking,
@@ -33,7 +33,7 @@ from runtime_config import (
     set_global_determinism,
     stage_seed,
 )
-from t6_core import T6_REPLICATIONS
+from T6_main import T6_REPLICATIONS
 
 
 def parse_years(value: str) -> list[int]:
@@ -326,8 +326,8 @@ def main() -> None:
     print(json.dumps({"run_dir": str(run_dir), "manifest": str(manifest_path)}, indent=2))
 
     if args.t6:
-        from t6_core import run_sampling
-        from workflow import evaluate_table4_primary
+        from T6_main import run_sampling
+        from main import evaluate_table4_primary
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]
