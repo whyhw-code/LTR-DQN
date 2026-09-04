@@ -56,6 +56,7 @@ daily action file, or historical `meiri_xuanze` selection file is required.
 - `.gitignore`: excludes generated `results/`, `temp/`, `model/`, `runs/`, and
   Python caches from commits.
 - `README.md`: this guide.
+- `README_CN.md`: Chinese version of this guide.
 
 Generated directories are created only after a run:
 
