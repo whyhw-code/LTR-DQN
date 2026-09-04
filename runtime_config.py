@@ -17,10 +17,8 @@ for _name in (
     "BLIS_NUM_THREADS",
 ):
     os.environ[_name] = "1"
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 os.environ["ATEN_CPU_CAPABILITY"] = "default"
 os.environ["MKL_CBWR"] = "COMPATIBLE"
-os.environ["XGBOOST_BUILD_DOC"] = "0"
 
 DEFAULT_DEVICE = "cpu"
 
