@@ -35,6 +35,7 @@ from runtime_config import load_stage_seed_config, set_global_determinism, stage
 
 BASELINES = ("LR", "MLP_R", "SVM_R", "XGB_R", "SVM_C", "MLP_C", "XGB_C")
 PRIMARY = ("LambdaRank", "LambdaMART", "LTR-DQN")
+BASELINE_CACHE_VERSION = "paper-t5-source-config-v2"
 
 
 def baseline_ranking(
@@ -48,12 +49,15 @@ def baseline_ranking(
         cached = pd.read_csv(path)
         if (
             "baseline_seed" in cached.columns
+            and "baseline_cache_version" in cached.columns
             and not cached.empty
             and (pd.to_numeric(cached.baseline_seed, errors="coerce") == seed).all()
+            and (cached.baseline_cache_version == BASELINE_CACHE_VERSION).all()
         ):
             return cached
     ranked = fit_baseline(market, year, model, seed=seed)
     ranked["baseline_seed"] = seed
+    ranked["baseline_cache_version"] = BASELINE_CACHE_VERSION
     path.parent.mkdir(parents=True, exist_ok=True)
     ranked.to_csv(path, index=False)
     return ranked
@@ -294,12 +298,30 @@ def run_table4(
                     classifier=model.endswith("_C"),
                 )
                 records.append(metric_record("T4", market, model, metrics, 3))
-        for model in PRIMARY:
-            metrics = evaluate_dqn_model(
+        primary_metrics = evaluate_table4_primary(
+            run_dir, market, seed_config, seed_override,
+            dqn_fixed_actions=dqn_fixed_actions,
+        )
+        for model, metrics in primary_metrics.items():
+            records.append(metric_record("T4", market, model, metrics, 3))
+
+
+def evaluate_table4_primary(
+    run_dir: Path, market: str, seed_config: dict, seed_override: int | None,
+    *, dqn_fixed_actions: bool = False,
+) -> dict[str, dict[str, float]]:
+    """Evaluate the three T4 primary models from one run's 3-year artifacts."""
+    return {
+        model: (
+            evaluate_dqn_model(
                 run_dir, market, 3, seed_config, seed_override,
                 fixed_actions=dqn_fixed_actions,
-            ) if model == "LTR-DQN" else evaluate_ranker(run_dir, market, 3, model)
-            records.append(metric_record("T4", market, model, metrics, 3))
+            )
+            if model == "LTR-DQN"
+            else evaluate_ranker(run_dir, market, 3, model)
+        )
+        for model in PRIMARY
+    }
 
 
 def run_table5(

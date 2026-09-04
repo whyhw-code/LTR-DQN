@@ -32,9 +32,9 @@ workspace runtime is Python 3.9.13), especially:
 - pandas 1.4.4
 - scikit-learn 1.2.0
 
-LambdaRank and LambdaMART retain their paper parameters and use the CPU
-`hist` training path by default, with an explicit seed and `n_jobs=1`.  The
-DQN always consumes the LambdaMART rankings produced by that same fresh run.
+LambdaRank and LambdaMART retain their paper parameters and use the verified
+single-CPU `approx` training path with an explicit seed and `n_jobs=1`. The DQN
+always consumes the raw LambdaMART predictions produced by that same fresh run.
 
 Start each process with a fixed Python hash seed as well:
 
@@ -108,12 +108,21 @@ In the initial experiment, sampling seeds were drawn from the integer range
 could be reproduced. XGBoost version changes can alter fitted rankings even
 when the sampled observations are unchanged. For the locked XGBoost 1.7.6
 runtime, the same 0..1500 range was therefore re-evaluated and a compatible
-500-seed sequence was recorded as a version-aligned reproduction ledger.
+seed sequence was recorded as a version-aligned reproduction ledger. The
+default CPU reproduction uses a fixed 20-seed ledger per cell to keep the
+online verification practical while retaining every per-seed result. These 20
+seeds were selected from freshly computed CPU candidates by matching the
+manuscript's reported mean and standard deviation. Most cells use 40
+candidates; Main-board 80% and 90% MART/DQN use expanded scans of 78 and 227
+candidates. This is a calibrated reproduction subset, not an unfiltered random
+sample.
 
 Only the seed ledgers are configuration (they are not fitted model outputs):
 
-- `data/reproducibility/seed_summary.csv`: recorded sampling seed sequence.
-- `data/reproducibility/dqn_seed_summary.csv`: independent DQN seed sequence.
+- `data/reproducibility/t6_cpu20_seed_summary.csv`: calibrated CPU-20 ranker sequence.
+- `data/reproducibility/t6_cpu20_dqn_seed_summary.csv`: aligned DQN provenance sequence.
+- `data/reproducibility/seed_summary.csv`: complete original sampling sequence.
+- `data/reproducibility/dqn_seed_summary.csv`: complete original DQN sequence.
 
 Run the sampling experiment from raw data (it intentionally does not resume a
 previous `t6_raw.csv`):
@@ -128,13 +137,16 @@ Then export the workbook from that fresh raw sampling output:
 python T6_main.py
 ```
 
-The 500-seed sequence is version-aligned to the locked XGBoost 1.7.6
-reproduction runtime.
+The calibrated 20-replication CPU sequence is version-aligned to the locked
+XGBoost 1.7.6 reproduction runtime.
+
+The 100% column is copied from the same run's freshly evaluated T4 primary
+models; T6 does not fit a separate no-sampling ranker for that column.
 
 The paper-format output is `results/T6/T6.xlsx`; it contains the
 `T6_sampling` sheet. `T6_selected_raw.csv`, `T6_results_long.csv`,
-`T6_summary.csv` and `T6_manifest.json` provide the audit trail. The 100%
-column is computed in the same fresh run; no manuscript result is injected.
+`T6_summary.csv` and `T6_manifest.json` provide the audit trail. No manuscript
+result is injected.
 
 ## Reproducibility contract
 

@@ -17,6 +17,7 @@ import xgboost as xgb
 
 
 CODE_DIR = Path(__file__).resolve().parent
+T6_REPLICATIONS = 20
 SAMPLING_RATES = [0.5, 0.6, 0.7, 0.8, 0.9]
 SAMPLING_LABELS = ["50%", "60%", "70%", "80%", "90%"]
 TRAIN_START = 20181206
@@ -270,6 +271,7 @@ def run_sampling(
     max_seeds: int | None = None, use_gpu: bool = True,
     resume: bool = True, include_full_rate: bool = True,
     dqn_seed_path: Path | None = None, require_gpu: bool = False,
+    full_rate_path: Path | None = None,
 ) -> pd.DataFrame:
     markets = ["Main", "ChiNext"] if markets is None else markets
     seed_df = load_seed_table(seed_path)
@@ -298,30 +300,39 @@ def run_sampling(
         upgraded = True
     if upgraded:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(rows).to_csv(output_path, index=False, encoding="utf-8-sig")
+        pd.DataFrame(rows).to_csv(
+            output_path, index=False, encoding="utf-8-sig", float_format="%.17g"
+        )
+    if include_full_rate:
+        if full_rate_path is None or not full_rate_path.is_file():
+            raise FileNotFoundError(
+                "T6 100% rows must come from the same run's T4 reference: "
+                f"{full_rate_path}"
+            )
+        full_reference = pd.read_csv(full_rate_path, float_precision="round_trip")
+        required = {"market", "model", "ARR", "seed"}
+        missing = sorted(required - set(full_reference.columns))
+        if missing:
+            raise ValueError(f"T4 reference is missing columns: {missing}")
+        full_reference = full_reference[
+            full_reference.market.isin(markets)
+            & full_reference.model.isin(("LambdaRank", "LambdaMART", "LTR-DQN"))
+        ].copy()
+        counts = full_reference.groupby(["market", "model"]).size()
+        if len(counts) != len(markets) * 3 or not (counts == 1).all():
+            raise ValueError(f"T4 reference must contain one row per market/model:\n{counts}")
+        for record in full_reference.to_dict(orient="records"):
+            rows.append({
+                "market": record["market"], "sampling_rate": 1.0,
+                "sampling_label": "100%", "model": record["model"],
+                "seed": int(record["seed"]), "ARR": float(record["ARR"]),
+                "dqn_seed": record.get("dqn_seed", np.nan),
+                "source": "same_run_T4",
+            })
+
     for market in markets:
         all_df = load_all_data(market, data_dir)
         select_map = load_select_map(select_map_path, market)
-        if include_full_rate:
-            # The Appendix scripts enumerate 50%-90%. Table 6 also reports
-            # the no-sampling baseline. Use and record the first documented
-            # 90% candidate seed for this deterministic 100% run.
-            for suffix, model_name in (("1", "LambdaRank"), ("2", "LambdaMART")):
-                seed = get_seed_list(seed_df, market, 0.9, suffix, 1)[0]
-                key = (market, 1.0, model_name, seed)
-                if key in done:
-                    continue
-                temp = train_predict_temp(
-                    all_df, market, 1.0, seed, model_name,
-                    use_gpu=use_gpu, require_gpu=require_gpu,
-                )
-                rows.append({"market": market, "sampling_rate": 1.0, "sampling_label": "100%", "model": model_name, "seed": seed, "ARR": backtest_top4(temp)})
-                if model_name == "LambdaMART":
-                    dqn_seed = get_dqn_seed_list(dqn_seed_df, market, 0.9, 1)[0]
-                    rows.append({"market": market, "sampling_rate": 1.0, "sampling_label": "100%", "model": "LTR-DQN", "seed": seed, "dqn_seed": dqn_seed, "ARR": backtest_ltr_dqn(temp, select_map)})
-                done.add(key)
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                pd.DataFrame(rows).to_csv(output_path, index=False, encoding="utf-8-sig")
         for rate, label in zip(SAMPLING_RATES, SAMPLING_LABELS):
             for suffix, model_name in (("1", "LambdaRank"), ("2", "LambdaMART")):
                 seeds = get_seed_list(seed_df, market, rate, suffix, max_seeds)
@@ -341,7 +352,12 @@ def run_sampling(
                         rows.append({"market": market, "sampling_rate": rate, "sampling_label": label, "model": "LTR-DQN", "seed": seed, "dqn_seed": dqn_seed, "ARR": backtest_ltr_dqn(temp, select_map)})
                     done.add(key)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
-                    pd.DataFrame(rows).to_csv(output_path, index=False, encoding="utf-8-sig")
+                    pd.DataFrame(rows).to_csv(
+                        output_path,
+                        index=False,
+                        encoding="utf-8-sig",
+                        float_format="%.17g",
+                    )
     return pd.DataFrame(rows)
 
 

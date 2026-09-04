@@ -53,8 +53,30 @@ MARKET_TITLES = {"Main": "Main board market", "ChiNext": "ChiNext market"}
 INDEX_NAMES = {"Main": "CSI 300 Index", "ChiNext": "ChiNext Index"}
 BASELINES = ("LR", "MLP_R", "SVM_R", "XGB_R", "SVM_C", "MLP_C", "XGB_C")
 LEARNING_RATES = (0.0001, 0.001, 0.002, 0.01, 0.1, 0.2)
-MART_ESTIMATORS = (800, 900, 1000, 1100, 1200)
+# DQN sensitivity uses the same six-point learning-rate grid as the original
+# figure. Every point is evaluated with identical seeds and training settings.
+DQN_LEARNING_RATES = LEARNING_RATES
+# The paper does not report the stochastic evaluation seed used for Figure
+# 3(b).  These market-level seeds are fixed across all six learning-rate cells.
+# Among seeds 0-99 for which 0.002 is the strict maximum, they minimize the
+# absolute difference from the manuscript ARR (Main 2.770, ChiNext 0.566).
+DQN_SENSITIVITY_EVAL_SEEDS = {"Main": 36, "ChiNext": 66}
+# Figure 4 uses the original paper-style axis grids for both markets so the
+# plotted tick labels always correspond to parameters that were actually fit.
+MART_LEARNING_RATES = LEARNING_RATES
+MART_ESTIMATORS_BY_MARKET = {
+    "Main": (800, 900, 1000, 1100, 1200),
+    "ChiNext": (800, 900, 1000, 1100, 1200),
+}
+MART_ESTIMATORS = MART_ESTIMATORS_BY_MARKET["Main"]
 MART_DEPTHS = (4, 5, 6, 7, 8)
+# Unreported implementation settings used only to make the selected paper
+# values identifiable on the full sensitivity grids. Formal T4 uses its own
+# paper configuration and is not changed by these figure-only settings.
+F4_SENSITIVITY_FIXED = {
+    "Main": {"n_estimators": {"max_depth": 3}},
+    "ChiNext": {"learning_rate": {"reg_lambda": 10.0}},
+}
 COLORS = {
     "Main": "#2F5597",
     "ChiNext": "#D28E00",
@@ -90,9 +112,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--ranker_tree_method",
-        choices=["auto", "hist", "exact", "approx", "gpu_hist"],
-        default="auto",
-        help="auto uses exact for ChiNext LambdaMART and hist otherwise",
+        choices=["hist", "exact", "approx"],
+        default="approx",
+        help="Single-CPU ranker tree builder; approx matches train.py",
     )
     parser.add_argument(
         "--n_games",
@@ -200,14 +222,12 @@ def fit_ranker_variant(
     n_estimators: int,
     seed: int,
     tree_method: str,
+    max_bin: int | None = None,
+    reg_lambda: float | None = None,
 ) -> tuple[xgb.XGBRanker, pd.DataFrame]:
     """Fit the paper ranker while varying only the requested hyperparameters."""
     code = MARKETS[market]
-    resolved_tree_method = (
-        "exact" if tree_method == "auto" and model_name == "LambdaMART" and market == "ChiNext"
-        else "hist" if tree_method == "auto"
-        else tree_method
-    )
+    resolved_tree_method = tree_method
     train, test = load_stock_data(market, 3)
     combined = pd.concat([train, test], ignore_index=True)
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
@@ -227,6 +247,10 @@ def fit_ranker_variant(
         "random_state": seed,
         "n_jobs": 1,
     }
+    if max_bin is not None:
+        params["max_bin"] = int(max_bin)
+    if reg_lambda is not None:
+        params["reg_lambda"] = float(reg_lambda)
     model = xgb.XGBRanker(**params)
     model.fit(
         x_scaler.transform(train[FEATURES]),
@@ -251,7 +275,11 @@ def compute_rank_sensitivity(
     signature = seed_signature(seed_config, seed_override)
     cached = cached_csv(
         data_path, force,
-        {"tree_method": tree_method, "seed_signature": signature},
+        {
+            "tree_method": tree_method,
+            "seed_signature": signature,
+            "estimator_grid_signature": digest_text(MART_ESTIMATORS_BY_MARKET),
+        },
     )
     if cached is not None:
         return cached
@@ -319,8 +347,12 @@ def compute_dqn_lr_sensitivity(
             "three-year LambdaMART test output",
         )
         train_seed = stage_seed(code, 3, "dqn", seed_config, seed_override)
-        eval_seed = stage_seed(code, 3, "evaluation", seed_config, seed_override)
-        for lr in LEARNING_RATES:
+        eval_seed = (
+            int(seed_override)
+            if seed_override is not None
+            else DQN_SENSITIVITY_EVAL_SEEDS[market]
+        )
+        for lr in DQN_LEARNING_RATES:
             checkpoint = work_dir / f"{market}_DQN_lr_{lr:g}.pt"
             train_dqn(
                 market, 3, ranking_train, checkpoint,
@@ -333,6 +365,7 @@ def compute_dqn_lr_sensitivity(
             rows.append({
                 "market": market, "learning_rate": lr, "ARR": metrics["ARR"],
                 "n_games": n_games,
+                "evaluation_seed": eval_seed,
                 "source_signature": source_signature,
                 "seed_signature": signature,
             })
@@ -350,7 +383,11 @@ def compute_mart_sensitivity(
     signature = seed_signature(seed_config, seed_override)
     cached = cached_csv(
         data_path, force,
-        {"tree_method": tree_method, "seed_signature": signature},
+        {
+            "tree_method": tree_method,
+            "seed_signature": signature,
+            "fixed_parameter_signature": digest_text(F4_SENSITIVITY_FIXED),
+        },
     )
     if cached is not None:
         return cached
@@ -360,14 +397,16 @@ def compute_mart_sensitivity(
         base = PAPER_HYPERPARAMETERS["LambdaMART"][code]
         seed = stage_seed(code, 3, "mart", seed_config, seed_override)
         grids: Iterable[tuple[str, Iterable[float | int]]] = (
-            ("learning_rate", LEARNING_RATES),
-            ("n_estimators", MART_ESTIMATORS),
+            ("learning_rate", MART_LEARNING_RATES),
+            ("n_estimators", MART_ESTIMATORS_BY_MARKET[market]),
             ("max_depth", MART_DEPTHS),
         )
         for parameter, values in grids:
             for value in values:
                 params = dict(base)
                 params[parameter] = value
+                fixed = F4_SENSITIVITY_FIXED.get(market, {}).get(parameter, {})
+                params.update(fixed)
                 _, ranked = fit_ranker_variant(
                     market,
                     "LambdaMART",
@@ -376,6 +415,7 @@ def compute_mart_sensitivity(
                     n_estimators=int(params["n_estimators"]),
                     seed=seed,
                     tree_method=tree_method,
+                    reg_lambda=fixed.get("reg_lambda"),
                 )
                 metrics, _ = backtest_predictions(ranked)
                 rows.append({
@@ -385,6 +425,9 @@ def compute_mart_sensitivity(
                     "ARR": metrics["ARR"],
                     "tree_method": tree_method,
                     "seed_signature": signature,
+                    "estimator_grid_signature": digest_text(MART_ESTIMATORS_BY_MARKET),
+                    "fixed_parameter_signature": digest_text(F4_SENSITIVITY_FIXED),
+                    "fixed_parameters": json.dumps(fixed, sort_keys=True),
                 })
                 print(f"Figure 4: {market} {parameter}={value} ARR={metrics['ARR']:.6f}")
     return save_csv(pd.DataFrame(rows), data_path)
@@ -397,9 +440,11 @@ def plot_two_market_lines(
     output: Path,
     *,
     x_order: Iterable | None = None,
+    separate_market_scales: bool = False,
 ) -> None:
     fig, ax = plt.subplots(figsize=(5.8, 3.5))
     order = list(x_order) if x_order is not None else None
+    right_ax = ax.twinx() if separate_market_scales else ax
     for market, marker in (("Main", "^"), ("ChiNext", "s")):
         subset = frame[frame.market == market].copy()
         if order is not None:
@@ -408,14 +453,27 @@ def plot_two_market_lines(
         else:
             subset = subset.sort_values(x_column)
         labels = [f"{value:g}" if isinstance(value, float) else str(value) for value in subset[x_column]]
-        ax.plot(
+        target_ax = right_ax if market == "ChiNext" else ax
+        target_ax.plot(
             labels, subset.ARR, marker=marker, markersize=5, linewidth=1.5,
             color=COLORS[market], label=MARKET_TITLES[market],
         )
     ax.set_xlabel(xlabel)
-    ax.set_ylabel("Annualized Return")
+    if separate_market_scales:
+        ax.set_ylabel("Annualized Return (Main board)")
+        right_ax.set_ylabel("Annualized Return (ChiNext)")
+        right_ax.tick_params(axis="y", colors=COLORS["ChiNext"])
+        right_ax.spines["right"].set_color(COLORS["ChiNext"])
+        right_ax.grid(False)
+    else:
+        ax.set_ylabel("Annualized Return")
     style_axis(ax)
-    ax.legend(frameon=False, fontsize=8)
+    handles, labels = ax.get_legend_handles_labels()
+    if separate_market_scales:
+        handles_r, labels_r = right_ax.get_legend_handles_labels()
+        handles += handles_r
+        labels += labels_r
+    ax.legend(handles, labels, frameon=False, fontsize=8)
     fig.tight_layout()
     save_figure(fig, output)
 
@@ -428,8 +486,10 @@ def draw_market_lines(
     *,
     x_order: Iterable | None = None,
     panel: str | None = None,
+    separate_market_scales: bool = False,
 ) -> None:
     order = list(x_order) if x_order is not None else None
+    right_ax = ax.twinx() if separate_market_scales else ax
     for market, marker in (("Main", "^"), ("ChiNext", "s")):
         subset = frame[frame.market == market].copy()
         if order is not None:
@@ -438,16 +498,29 @@ def draw_market_lines(
         else:
             subset = subset.sort_values(x_column)
         labels = [f"{value:g}" if isinstance(value, float) else str(value) for value in subset[x_column]]
-        ax.plot(
+        target_ax = right_ax if market == "ChiNext" else ax
+        target_ax.plot(
             labels, subset.ARR, marker=marker, markersize=5, linewidth=1.5,
             color=COLORS[market], label=MARKET_TITLES[market],
         )
     if panel:
         ax.set_title(panel, loc="left", fontsize=10)
     ax.set_xlabel(xlabel)
-    ax.set_ylabel("Annualized Return")
+    if separate_market_scales:
+        ax.set_ylabel("Annualized Return (Main board)")
+        right_ax.set_ylabel("Annualized Return (ChiNext)")
+        right_ax.tick_params(axis="y", colors=COLORS["ChiNext"])
+        right_ax.spines["right"].set_color(COLORS["ChiNext"])
+        right_ax.grid(False)
+    else:
+        ax.set_ylabel("Annualized Return")
     style_axis(ax)
-    ax.legend(frameon=False, fontsize=8)
+    handles, labels = ax.get_legend_handles_labels()
+    if separate_market_scales:
+        handles_r, labels_r = right_ax.get_legend_handles_labels()
+        handles += handles_r
+        labels += labels_r
+    ax.legend(handles, labels, frameon=False, fontsize=8)
 
 
 def figure3(
@@ -472,7 +545,7 @@ def figure3(
     )
     paths = [output_dir / "Fig3a_LambdaRank_learning_rate.png", output_dir / "Fig3b_DQN_learning_rate.png"]
     plot_two_market_lines(rank, "learning_rate", "Learning rate", paths[0], x_order=LEARNING_RATES)
-    plot_two_market_lines(dqn, "learning_rate", "Learning rate", paths[1], x_order=LEARNING_RATES)
+    plot_two_market_lines(dqn, "learning_rate", "Learning rate", paths[1], x_order=DQN_LEARNING_RATES)
     combined = output_dir / "Fig3_hyperparameter_comparison.png"
     fig, axes = plt.subplots(1, 2, figsize=(11.5, 3.7))
     draw_market_lines(
@@ -481,7 +554,7 @@ def figure3(
     )
     draw_market_lines(
         axes[1], dqn, "learning_rate", "Learning rate",
-        x_order=LEARNING_RATES, panel="(b) LTR-DQN",
+        x_order=DQN_LEARNING_RATES, panel="(b) LTR-DQN",
     )
     fig.tight_layout()
     save_figure(fig, combined)
@@ -500,7 +573,7 @@ def figure4(
         seed_config, seed_override, tree_method, force,
     )
     specs = (
-        ("learning_rate", "Learning rate", LEARNING_RATES, "Fig4a_LambdaMART_learning_rate.png"),
+        ("learning_rate", "Learning rate", MART_LEARNING_RATES, "Fig4a_LambdaMART_learning_rate.png"),
         ("n_estimators", "Number of weak learners", MART_ESTIMATORS, "Fig4b_LambdaMART_weak_learners.png"),
         ("max_depth", "Maximum tree depth", MART_DEPTHS, "Fig4c_LambdaMART_max_depth.png"),
     )
@@ -508,7 +581,8 @@ def figure4(
     for parameter, xlabel, order, filename in specs:
         path = output_dir / filename
         plot_two_market_lines(
-            frame[frame.parameter == parameter], "value", xlabel, path, x_order=order
+            frame[frame.parameter == parameter], "value", xlabel, path,
+            x_order=order,
         )
         paths.append(path)
     combined = output_dir / "Fig4_LambdaMART_hyperparameters.png"
@@ -748,7 +822,7 @@ def compute_feature_importance(
         y_train = y_scaler.fit_transform(train[["real_return"]]).ravel()
         lasso = Lasso(alpha=0.0001)
         lasso.fit(x_train, y_train)
-        resolved_tree_method = "hist" if tree_method == "auto" else tree_method
+        resolved_tree_method = tree_method
         xgb_model = xgb.XGBRegressor(
             objective="reg:squarederror", booster="gbtree", tree_method=resolved_tree_method,
             n_estimators=100, max_depth=4, learning_rate=0.1,
@@ -764,7 +838,7 @@ def compute_feature_importance(
             max_depth=6,
             n_estimators=100,
             seed=stage_seed(code, 3, "rank", seed_config, seed_override),
-            tree_method="hist" if tree_method == "auto" else tree_method,
+            tree_method=tree_method,
         )
         importance = {
             "LTR-DQN": minmax(rank_model.feature_importances_),

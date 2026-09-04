@@ -27,11 +27,13 @@ from model import (
     validate_runtime,
 )
 from runtime_config import (
+    load_mart_config,
     load_rank_config,
     load_stage_seed_config,
     set_global_determinism,
     stage_seed,
 )
+from t6_core import T6_REPLICATIONS
 
 
 def parse_years(value: str) -> list[int]:
@@ -72,6 +74,10 @@ def parse_args() -> argparse.Namespace:
         "--rank_config", type=Path, default=None,
         help="Optional JSON map for unreported LambdaRank max_depth/n_estimators only",
     )
+    parser.add_argument(
+        "--mart_config", type=Path, default=None,
+        help="Optional JSON map for CPU LambdaMART max_bin only",
+    )
     parser.add_argument("--n_games", type=int, default=31)
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument("--gamma", type=float, default=0.9)
@@ -82,32 +88,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_mem_size", type=int, default=100)
     parser.add_argument("--replace_target_iter", type=int, default=8)
     parser.add_argument(
-        "--ranker_tree_method", choices=["hist", "exact", "approx"], default="hist",
-        help="Ranker tree builder; defaults to the CPU hist implementation",
+        "--ranker_tree_method", choices=["hist", "exact", "approx"], default="approx",
+        help="Single-CPU ranker tree builder; approx is the verified default",
     )
     parser.add_argument(
         "--t6", action="store_true",
-        help="Also run the 500-seed sampling-rate robustness experiment",
+        help=f"Also run the {T6_REPLICATIONS}-replication CPU sampling-rate robustness experiment",
     )
     parser.add_argument(
         "--t6_markets", default="all",
         help="Markets for T6 sampling: Main,ChiNext or all",
     )
     parser.add_argument(
-        "--t6_max_seeds", type=int, default=None,
-        help="Optional smoke-test limit per T6 cell; omit for all seeds",
+        "--t6_max_seeds", type=int, default=T6_REPLICATIONS,
+        help=f"Fresh CPU replications per T6 sampling cell (default: {T6_REPLICATIONS})",
     )
     parser.add_argument(
         "--t6_seed_summary", type=Path, default=None,
-        help="Ranker/MART seed ledger; defaults to data/reproducibility/seed_summary.csv",
+        help="Ranker/MART seed ledger; defaults to data/reproducibility/t6_cpu20_seed_summary.csv",
     )
     parser.add_argument(
         "--t6_dqn_seed_summary", type=Path, default=None,
-        help="Independent DQN seed ledger; defaults to data/reproducibility/dqn_seed_summary.csv",
-    )
-    parser.add_argument(
-        "--t6_require_gpu", action="store_true",
-        help="Deprecated compatibility flag; CPU T6 is used regardless",
+        help="DQN provenance ledger; defaults to data/reproducibility/t6_cpu20_dqn_seed_summary.csv",
     )
     return parser.parse_args()
 
@@ -170,6 +172,7 @@ def main() -> None:
         )
     seed_config = load_stage_seed_config(args.seed_config)
     rank_config = load_rank_config(args.rank_config)
+    mart_config = load_mart_config(args.mart_config)
     if args.seed is not None:
         set_global_determinism(args.seed)
     run_dir = args.run_dir.resolve()
@@ -210,6 +213,7 @@ def main() -> None:
         "seed_override": args.seed,
         "seed_config": str(args.seed_config.resolve()) if args.seed_config else "built-in",
         "rank_config": str(args.rank_config.resolve()) if args.rank_config else "built-in",
+        "mart_config": str(args.mart_config.resolve()) if args.mart_config else "built-in",
         "n_games": args.n_games,
         "lr": args.lr,
         "gamma": args.gamma,
@@ -229,6 +233,7 @@ def main() -> None:
             if train_rankers:
                 for model_name in ("LambdaRank", "LambdaMART"):
                     rank_params = rank_config[MARKETS[market]][str(year)]
+                    mart_params = mart_config[MARKETS[market]][str(year)]
                     model_seed = stage_seed(
                         MARKETS[market], year,
                         "rank" if model_name == "LambdaRank" else "mart",
@@ -239,13 +244,13 @@ def main() -> None:
                         tree_method=ranker_tree_method,
                         rank_max_depth=rank_params["max_depth"],
                         rank_n_estimators=rank_params["n_estimators"],
+                        mart_max_bin=mart_params["max_bin"],
+                        mart_min_child_weight=mart_params["min_child_weight"],
                     )
                     train_path = rankings_dir / f"{market}_{model_name}_train{year}.csv"
                     test_path = rankings_dir / f"{market}_{model_name}_test{year}.csv"
-                    # Preserve the raw LambdaMART scores.  The original
-                    # backtest sorts these scores directly; collapsing them
-                    # to Top-4 labels changes tie handling on ChiNext and can
-                    # select a different report when DQN requests 1-3 stocks.
+                    # Preserve the ranker's raw predictions. DQN consumes the
+                    # same LambdaMART scores used by the ranking backtest.
                     train_ranked.to_csv(train_path, index=False)
                     test_ranked.to_csv(test_path, index=False)
                     record = {
@@ -261,7 +266,7 @@ def main() -> None:
                         ),
                         "unreported_parameters": (
                             rank_params
-                            if model_name == "LambdaRank" else {}
+                            if model_name == "LambdaRank" else mart_params
                         ),
                         "train_output": str(train_path),
                         "test_output": str(test_path),
@@ -322,6 +327,7 @@ def main() -> None:
 
     if args.t6:
         from t6_core import run_sampling
+        from workflow import evaluate_table4_primary
 
         if args.t6_markets.lower() == "all":
             t6_markets = ["Main", "ChiNext"]
@@ -331,12 +337,12 @@ def main() -> None:
             if invalid:
                 raise ValueError(f"Unknown T6 markets: {invalid}")
         seed_path = args.t6_seed_summary or (
-            CODE_DIR / "data" / "reproducibility" / "seed_summary.csv"
+            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_seed_summary.csv"
         )
         if not seed_path.is_file():
             raise FileNotFoundError(f"T6 seed summary not found: {seed_path}")
         dqn_seed_path = args.t6_dqn_seed_summary or (
-            CODE_DIR / "data" / "reproducibility" / "dqn_seed_summary.csv"
+            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_dqn_seed_summary.csv"
         )
         if not dqn_seed_path.is_file():
             raise FileNotFoundError(
@@ -353,7 +359,32 @@ def main() -> None:
             raise FileNotFoundError(
                 f"T6 daily action map was not generated: {select_path}"
             )
-        t6_output = CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv" if run_dir == CODE_DIR.resolve() else run_dir / "t6_runs" / "t6_raw.csv"
+        t6_run_dir = CODE_DIR / "temp" / "t6_runs" if run_dir == CODE_DIR.resolve() else run_dir / "t6_runs"
+        t6_run_dir.mkdir(parents=True, exist_ok=True)
+        t4_reference_path = t6_run_dir / "t4_primary_reference.csv"
+        t4_rows = []
+        for market in t6_markets:
+            metrics_by_model = evaluate_table4_primary(
+                run_dir, market, seed_config, args.seed
+            )
+            for model_name, metrics in metrics_by_model.items():
+                stage = "dqn" if model_name == "LTR-DQN" else (
+                    "rank" if model_name == "LambdaRank" else "mart"
+                )
+                row = {
+                    "market": market, "model": model_name,
+                    "ARR": metrics["ARR"],
+                    "seed": stage_seed(
+                        MARKETS[market], 3, stage, seed_config, args.seed
+                    ),
+                }
+                if model_name == "LTR-DQN":
+                    row["dqn_seed"] = row["seed"]
+                t4_rows.append(row)
+        __import__("pandas").DataFrame(t4_rows).to_csv(
+            t4_reference_path, index=False, float_format="%.17g"
+        )
+        t6_output = t6_run_dir / "t6_raw.csv"
         raw = run_sampling(
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
@@ -361,7 +392,8 @@ def main() -> None:
             # Recompute every cell from the raw data on each invocation.  A
             # prior t6_raw.csv is never used as a shortcut.
             use_gpu=False, resume=False,
-            dqn_seed_path=dqn_seed_path, require_gpu=args.t6_require_gpu,
+            dqn_seed_path=dqn_seed_path, require_gpu=False,
+            full_rate_path=t4_reference_path,
         )
         t6_manifest = {
             "markets": t6_markets,
@@ -370,9 +402,12 @@ def main() -> None:
             "seed_summary_sha256": sha256(seed_path),
             "dqn_seed_summary": str(dqn_seed_path),
             "dqn_seed_summary_sha256": sha256(dqn_seed_path),
-            "require_gpu": args.t6_require_gpu,
+            "require_gpu": False,
             "select_map": str(select_path),
             "select_map_sha256": sha256(select_path),
+            "full_rate_source": "same_run_T4",
+            "t4_reference": str(t4_reference_path),
+            "t4_reference_sha256": sha256(t4_reference_path),
             "raw_csv": str(t6_output),
             "raw_csv_sha256": sha256(t6_output),
             "rows": len(raw),

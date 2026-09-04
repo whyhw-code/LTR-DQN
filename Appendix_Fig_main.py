@@ -40,6 +40,7 @@ from experiment_core import (
     sha256,
     validate_runtime,
 )
+from t6_core import T6_REPLICATIONS
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -83,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--t6_csv", type=Path, default=CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv",
-        help="500-seed selected raw results used by Figure C4",
+        help=f"{T6_REPLICATIONS}-replication raw results used by Figure C4",
     )
     parser.add_argument(
         "--broker_file", type=Path, default=None,
@@ -533,27 +534,32 @@ def plot_c3(frame: pd.DataFrame, path: Path) -> None:
 
 
 def compute_c4(t6_csv: Path, data_path: Path, force: bool) -> pd.DataFrame:
-    t6_csv = require_file(t6_csv, "T6 500-seed selected results")
+    t6_csv = require_file(t6_csv, f"T6 {T6_REPLICATIONS}-replication results")
     signature = file_signature([t6_csv, *implementation_paths()])
     cached = cached_csv(data_path, signature, force)
     if cached is not None:
         return cached
-    frame = pd.read_csv(t6_csv)
+    frame = pd.read_csv(t6_csv, float_precision="round_trip")
     if "sampling_rate" not in frame.columns and "rate" in frame.columns:
         frame["sampling_rate"] = pd.to_numeric(frame.rate, errors="coerce")
     required = {"market", "sampling_rate", "model", "seed", "ARR"}
     missing = sorted(required - set(frame.columns))
     if missing:
         raise ValueError(f"T6 input is missing {missing}: {t6_csv}")
+    frame["sampling_rate"] = pd.to_numeric(
+        frame["sampling_rate"], errors="coerce"
+    ).round(10)
     frame = frame[
         frame.market.isin(MARKET_ORDER)
         & frame.model.isin(MODELS)
         & frame.sampling_rate.isin(RATES)
     ].copy()
     counts = frame.groupby(["market", "sampling_rate", "model"]).size()
-    incomplete = counts[counts < 500]
+    incomplete = counts[counts < T6_REPLICATIONS]
     if not incomplete.empty:
-        raise ValueError(f"Figure C4 requires 500 results per cell; incomplete:\n{incomplete}")
+        raise ValueError(
+            f"Figure C4 requires {T6_REPLICATIONS} results per cell; incomplete:\n{incomplete}"
+        )
     return save_csv(frame, data_path, signature)
 
 
@@ -702,7 +708,7 @@ def main() -> None:
         "C1": "Long-horizon index and all-report baseline portfolio curves.",
         "C2": "Uses a true brokerage identifier when supplied; otherwise broker_size is an explicitly labelled proxy.",
         "C3": "Current DQN daily stock counts and current LambdaMART ranking, re-backtested under four fee settings.",
-        "C4": "Uses the fixed 500-seed-per-cell T6 selected-result ledger.",
+        "C4": f"Uses the fixed {T6_REPLICATIONS}-replication-per-cell T6 result ledger.",
         "C5": "Current DQN daily stock counts applied to the supplied ESG ranking data.",
     }
 

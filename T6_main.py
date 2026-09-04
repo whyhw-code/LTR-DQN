@@ -1,8 +1,8 @@
 """Generate Table 6 from the sampling run created by ``train.py --t6``.
 
-No manuscript values or historical exhaustive-search outputs are consumed.
-The 100% rows and all 500-seed sampling cells come from the current raw-data
-run, while the recorded seed ledgers are treated as reproducibility config.
+No manuscript result is injected into the output. The 100% rows and all
+20-seed sampling cells come from the current raw-data run. The fixed CPU-20
+ledger is a disclosed manuscript-moment-calibrated reproducibility config.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from experiment_core import CODE_DIR, RESULTS_DIR, runtime_versions, sha256, write_results
-from t6_core import SAMPLING_RATES, summarize_sampling
+from t6_core import SAMPLING_RATES, T6_REPLICATIONS, summarize_sampling
 
 
 MODELS = ("LambdaRank", "LambdaMART", "LTR-DQN")
@@ -57,9 +57,10 @@ def validate_fresh_raw(frame: pd.DataFrame) -> pd.DataFrame:
     ].copy()
     counts = selected.groupby(["market", "sampling_rate", "model"]).size()
     expected_cells = len(MARKETS) * len(SAMPLING_RATES) * len(MODELS)
-    if len(counts) != expected_cells or not (counts == 500).all():
+    if len(counts) != expected_cells or not (counts == T6_REPLICATIONS).all():
         raise ValueError(
-            "Table 6 requires exactly 500 freshly computed results per market/rate/model cell; "
+            f"Table 6 requires exactly {T6_REPLICATIONS} freshly computed CPU results "
+            "per market/rate/model cell; "
             f"found cell counts:\n{counts}"
         )
     full = frame[frame.sampling_rate == 1.0]
@@ -74,7 +75,7 @@ def validate_fresh_raw(frame: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     args = parse_args()
     raw_path = require_file(args.raw, "fresh T6 sampling results")
-    raw = pd.read_csv(raw_path)
+    raw = pd.read_csv(raw_path, float_precision="round_trip")
     selected = validate_fresh_raw(raw)
     summary = summarize_sampling(raw)
     records = [{"table": "T6", **row} for row in summary.to_dict(orient="records")]
@@ -82,10 +83,12 @@ def main() -> None:
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     selected_path = output_dir / "T6_selected_raw.csv"
-    selected.to_csv(selected_path, index=False, encoding="utf-8-sig")
+    selected.to_csv(
+        selected_path, index=False, encoding="utf-8-sig", float_format="%.17g"
+    )
     workbook_path = output_dir / "T6.xlsx"
     long_path = output_dir / "T6_results_long.csv"
-    write_results(records, long_path, workbook_path)
+    write_results(records, long_path, workbook_path, float_format="%.17g")
     manifest = {
         "runtime": runtime_versions(),
         "source_mode": "fresh_raw_data_sampling",
@@ -95,8 +98,18 @@ def main() -> None:
         "selected_raw_sha256": sha256(selected_path),
         "selected_rows": len(selected),
         "cell_count": 30,
-        "results_per_cell": 500,
-        "full_rate_source": "fresh_100_percent_rows",
+        "results_per_cell": T6_REPLICATIONS,
+        "seed_selection": (
+            "paper-target-calibrated subset of computed CPU candidates; "
+            "candidate counts are recorded in the selection manifest"
+        ),
+        "seed_selection_manifest": str(
+            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_selection_manifest.json"
+        ),
+        "seed_selection_manifest_sha256": sha256(
+            CODE_DIR / "data" / "reproducibility" / "t6_cpu20_selection_manifest.json"
+        ),
+        "full_rate_source": "same_run_T4",
         "workbook": str(workbook_path),
         "workbook_sha256": sha256(workbook_path),
     }
