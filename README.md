@@ -71,7 +71,9 @@ results/    workbooks, paper CSVs, figure PNGs, and audit CSVs
 ## Requirements
 
 - Python 3.9.13, 64-bit x86 (`x64`).
-- Windows 10/11 or Linux x86_64. GitHub Actions uses Ubuntu 22.04 x64.
+- This reproduction supports 64-bit Windows only: Windows 10/11 locally and
+  the standard Windows Server 2022 x64 runner in GitHub Actions. Do not switch
+  the workflows to a Linux runner.
 - CPU only. GPU is not required and is not selected by the default code path.
 - One compute thread is enforced for BLAS, XGBoost, and PyTorch to reduce
   cross-machine variation. More CPU cores may improve operating-system
@@ -80,9 +82,8 @@ results/    workbooks, paper CSVs, figure PNGs, and audit CSVs
   all-years run, because the training and figure steps create temporary files.
 
 Important pinned versions include pip 24.1.2, NumPy 1.21.5, pandas 1.4.4,
-scikit-learn 1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. pip 24.1.2 avoids a
-newer `pip check` false positive for the legacy XGBoost Linux wheel. The entry
-points check the locked runtime before fitting and stop on a mismatch.
+scikit-learn 1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. The entry points check
+the locked runtime before fitting and stop on a mismatch.
 
 ## Installation
 
@@ -96,18 +97,6 @@ py -3.9 -m venv .venv
 python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
-```
-
-### Linux Bash
-
-```bash
-git clone https://github.com/whyhw-code/LTR-DQN.git
-cd LTR-DQN
-python3.9 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade "pip==24.1.2"
-python -m pip install -r requirements-lock.txt
-export PYTHONHASHSEED=0
 ```
 
 The Conda alternative is:
@@ -190,10 +179,10 @@ an external intermediate file.
 4. Open the completed run and download its artifact. The artifact contains the
    generated workbook, CSVs, figures, and manifests.
 
-Both workflows use an x64 Ubuntu 22.04 CPU runner, Python 3.9.13, a fixed hash
-seed, and single-thread settings. The runner is fixed in the workflow, so there
-is no runner choice to make when starting a run. They do not require or request
-a GPU runner.
+Both workflows use a standard Windows Server 2022 x64 CPU runner, Python
+3.9.13, a fixed hash seed, and single-thread settings. The runner is fixed in
+the workflow, so there is no runner choice to make when starting a run. They do
+not require or request a GPU runner.
 
 ## Reproducibility notes
 
@@ -204,7 +193,7 @@ a GPU runner.
 - `PYTHONHASHSEED=0`, fixed seeds, deterministic PyTorch settings, stable CSV
   ordering, and `n_jobs=1` are enabled to reduce platform variation.
 - Manifests record runtime versions, input hashes, action hashes, and checkpoint
-  hashes. Exact byte-for-byte equality across unrelated operating systems is
-  not guaranteed by XGBoost/PyTorch; a mismatch is visible in the manifests.
+  hashes. This reproduction requires Windows; cross-operating-system outputs
+  are not treated as normative reproduction results.
 - Do not change `--seed`, `--seed_config`, `--lr`, `--n_games`, or
   `--ranker_tree_method` when reproducing the reported default run.

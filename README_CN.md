@@ -50,12 +50,12 @@ results/    工作簿、CSV、图片和审计文件
 ## 系统和设备要求
 
 - Python 3.9.13，64 位 x86（x64）。
-- Windows 10/11 或 Linux x86_64；GitHub Actions 使用 Ubuntu 22.04 x64。
+- 本复现版本只支持 64 位 Windows：本地使用 Windows 10/11，GitHub Actions 固定使用标准 Windows Server 2022 x64 runner。不要改用 Linux runner。
 - 全流程使用 CPU，不要求 GPU，也不会选择 GPU 设备。
 - BLAS、XGBoost 和 PyTorch 固定为单线程，以降低不同机器之间的差异。
 - 完整运行建议至少 8 GB 内存和 10 GB 可用磁盘空间。
 
-主要固定版本：pip 24.1.2、NumPy 1.21.5、pandas 1.4.4、scikit-learn 1.2.0、PyTorch 2.0.0+cpu、XGBoost 1.7.6。入口脚本会在训练前检查环境版本，发现不一致会停止。固定 pip 24.1.2 是为了避免新版 `pip check` 错误地把 XGBoost 1.7.6 的 Linux wheel 判定为平台不兼容。
+主要固定版本：pip 24.1.2、NumPy 1.21.5、pandas 1.4.4、scikit-learn 1.2.0、PyTorch 2.0.0+cpu、XGBoost 1.7.6。入口脚本会在训练前检查环境版本，发现不一致会停止。
 
 ## 环境配置
 
@@ -69,18 +69,6 @@ py -3.9 -m venv .venv
 python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
-```
-
-### Linux Bash
-
-```bash
-git clone https://github.com/whyhw-code/LTR-DQN.git
-cd LTR-DQN
-python3.9 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade "pip==24.1.2"
-python -m pip install -r requirements-lock.txt
-export PYTHONHASHSEED=0
 ```
 
 也可以使用 Conda：
@@ -152,12 +140,12 @@ python Appendix_Fig_main.py --figures C4 --force
 3. 选择 **2 - T6 and Figure C4 (CPU)**，点击 **Run workflow**，生成 T6 和附录 C4。
 4. 运行结束后下载 artifact，其中包含工作簿、CSV、图片和运行清单。
 
-两个 workflow 都固定使用 Ubuntu 22.04 x64 CPU、Python 3.9.13、固定 hash seed 和单线程设置。启动时不需要选择 runner，也不需要 GPU runner。
+两个 workflow 都固定使用标准 Windows Server 2022 x64 CPU runner、Python 3.9.13、固定 hash seed 和单线程设置。启动时不需要选择 runner，也不需要 GPU runner。
 
 ## 复现注意事项
 
 - 默认种子映射在 `runtime_config.py`，T6 种子表在 `data/reproducibility/`。
 - LambdaRank、LambdaMART 每次都从原始数据重新训练；DQN 使用同一次运行产生的 LambdaMART 输出。
 - `PYTHONHASHSEED=0`、固定种子、PyTorch 确定性设置、稳定 CSV 排序和 `n_jobs=1` 用于减少平台差异。
-- 运行清单记录依赖版本、输入哈希、动作哈希和检查点哈希。不同操作系统之间不保证字节级完全相同，差异会在清单中显示。
+- 运行清单记录依赖版本、输入哈希、动作哈希和检查点哈希。本复现流程要求使用 Windows，不把跨操作系统结果作为规范复现结果。
 - 复现默认结果时不要修改 `--seed`、`--seed_config`、`--lr`、`--n_games` 或 `--ranker_tree_method`。

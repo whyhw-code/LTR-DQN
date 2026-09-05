@@ -7,7 +7,7 @@
 - **1 - Results and Figures (CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5。
 - **2 - T6 and Figure C4 (CPU)**：单独生成 T6 和附录图 C4。
 
-两个任务都固定使用 GitHub 提供的标准 Ubuntu 22.04 x64 CPU。无需创建或选择 runner，也无需选择 GPU。
+两个任务都固定使用 GitHub 提供的标准 Windows Server 2022 x64 CPU。这个复现版本不支持 Linux runner。无需创建或选择 runner，也无需选择 GPU。
 
 ## 一、准备新账号
 
@@ -15,7 +15,7 @@
 2. 打开原仓库：<https://github.com/whyhw-code/LTR-DQN>。
 3. 确认页面显示的是 `main` 分支。
 
-建议将复现仓库保持为 **Public（公开）**。本项目使用标准 GitHub-hosted runner；公开仓库使用这种标准 runner 不收取 GitHub Actions 运行分钟费用。请勿把工作流改成 larger runner、GPU runner 或自托管付费设备。
+建议将复现仓库保持为 **Public（公开）**。本项目使用标准 Windows GitHub-hosted runner；公开仓库使用这种标准 runner 不收取 GitHub Actions 运行分钟费用。请勿把工作流改成 Linux、larger runner、GPU runner 或自托管付费设备。
 
 ## 二、复制仓库到新账号
 
@@ -122,11 +122,11 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 
 ### GitHub 要求选择 runner
 
-本仓库的 runner 已在工作流中固定为 `ubuntu-22.04`，正常启动页面不会要求选择。不要进入组织的 **Settings > Actions > Runners** 创建机器；直接在仓库的 **Actions** 页面运行即可。
+本仓库的 runner 已在工作流中固定为 `windows-2022`，正常启动页面不会要求选择。不要进入组织的 **Settings > Actions > Runners** 创建机器；直接在仓库的 **Actions** 页面运行即可。
 
 ### 环境安装失败
 
-打开失败记录，展开 **Install locked environment**，保存完整错误信息。工作流锁定 Python 3.9.13、pip 24.1.2 和实验依赖版本，安装失败时不要随意升级包版本，否则可能改变结果。2026 年 9 月 5 日以前 Fork 的版本如果显示 `xgboost 1.7.6 is not supported on this platform`，请先按下方“Fork 后原仓库更新了”同步 `main`，再重新运行。
+打开失败记录，展开 **Install locked environment**，保存完整错误信息。工作流锁定 Windows Server 2022 x64、Python 3.9.13、pip 24.1.2 和实验依赖版本，安装失败时不要随意升级包版本，否则可能改变结果。2026 年 9 月 5 日以前 Fork 的 Linux 版本如果显示 `xgboost 1.7.6 is not supported on this platform`，请先按下方“Fork 后原仓库更新了”同步 `main`，再重新运行 Windows 版本。
 
 ### Fork 后原仓库更新了
 
@@ -138,7 +138,7 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 
 ### 是否会收费
 
-当 Fork 保持公开，并且工作流仍使用标准 `ubuntu-22.04` GitHub-hosted runner 时，GitHub Actions 的标准 runner 运行分钟不收费。存储和使用政策仍以 GitHub 当前规则为准。不要改用 larger runner 或 GPU runner，它们可能单独计费。
+当 Fork 保持公开，并且工作流仍使用标准 `windows-2022` GitHub-hosted runner 时，GitHub Actions 的标准 runner 运行分钟不收费。存储和使用政策仍以 GitHub 当前规则为准。不要改用 larger runner 或 GPU runner，它们可能单独计费。
 
 ## 九、复现检查清单
 

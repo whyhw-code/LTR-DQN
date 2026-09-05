@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   reproduce:
-    runs-on: ubuntu-22.04
+    runs-on: windows-2022
     timeout-minutes: 720
     env:
       MPLBACKEND: Agg
@@ -25,17 +25,17 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-lock.txt
       - name: Verify fresh source-only checkout
-        shell: bash
+        shell: pwsh
         run: |
-          test ! -e results
-          test ! -e temp
-          test ! -e model
-          test ! -e runs
+          $generated = @("results", "temp", "model", "runs") |
+            Where-Object { Test-Path -LiteralPath $_ }
+          if ($generated) {
+            throw "Generated directories are present in the source checkout: $($generated -join ', ')"
+          }
       - name: Install locked environment
-        shell: bash
+        shell: pwsh
         run: |
-          # pip >=24.2 misreads the legacy XGBoost 1.7.6 Linux wheel tag in
-          # `pip check`, even though pip has just installed the correct wheel.
+          # Keep installer behavior identical across fresh Windows runners.
           python -m pip install --upgrade "pip==24.1.2"
           python -m pip install -r requirements-lock.txt
           python -m pip check
