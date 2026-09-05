@@ -4,8 +4,8 @@
 
 在线复现分为两个独立任务：
 
-- **1 - Results and Figures (CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5。
-- **2 - T6 and Figure C4 (CPU)**：单独生成 T6 和附录图 C4。
+- **1 - One-click Results and Figures (Windows CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5。
+- **2 - One-click T6 and Figure C4 (Windows CPU)**：单独生成 T6 和附录图 C4。
 
 两个任务都固定使用 GitHub 提供的标准 Windows Server 2022 x64 CPU。这个复现版本不支持 Linux runner。无需创建或选择 runner，也无需选择 GPU。
 
@@ -13,7 +13,7 @@
 
 1. 登录新的 GitHub 账号。
 2. 打开原仓库：<https://github.com/whyhw-code/LTR-DQN>。
-3. 确认页面显示的是 `main` 分支。
+3. 仓库只有 `main` 分支，不需要判断或选择其他分支。
 
 建议将复现仓库保持为 **Public（公开）**。本项目使用标准 Windows GitHub-hosted runner；公开仓库使用这种标准 runner 不收取 GitHub Actions 运行分钟费用。请勿把工作流改成 Linux、larger runner、GPU runner 或自托管付费设备。
 
@@ -22,7 +22,7 @@
 1. 点击仓库页面右上角的 **Fork**。
 2. 在 **Owner** 中选择你的新账号。
 3. **Repository name** 保持为 `LTR-DQN`，也可以填写自己的名称。
-4. 勾选 **Copy the main branch only**（只复制 main 分支）。
+4. 仓库只有 `main`，保持 GitHub 页面默认设置即可，不需要处理分支选项。
 5. 点击 **Create fork**。
 6. 等待页面跳转到新账号下的仓库，例如：
 
@@ -39,18 +39,18 @@ Fork 会复制原始数据、脚本、环境锁定文件和两个在线复现工
 3. 左侧应出现以下两个工作流：
 
    ```text
-   1 - Results and Figures (CPU)
-   2 - T6 and Figure C4 (CPU)
+   1 - One-click Results and Figures (Windows CPU)
+   2 - One-click T6 and Figure C4 (Windows CPU)
    ```
 
 如果已经直接看到这两个名称，说明 Actions 已启用，不需要额外设置。
 
 ## 四、运行 Results 和正文图
 
-1. 在 Actions 页面左侧点击 **1 - Results and Figures (CPU)**。
+1. 在 Actions 页面左侧点击 **1 - One-click Results and Figures (Windows CPU)**。
 2. 点击右侧的 **Run workflow**。
-3. 如果出现分支选择框，保持 **Branch: main**。
-4. 再点击绿色的 **Run workflow** 确认启动。
+3. 页面没有实验参数需要填写；仓库只有 `main`，因此也没有分支需要选择。
+4. 点击绿色的 **Run workflow** 确认启动。
 5. 页面出现新的运行记录后，点击该记录查看进度。
 
 这个任务会从原始数据重新训练模型，然后生成：
@@ -67,10 +67,9 @@ results/appendix_figures/           附录图 C1、C2、C3、C5 及审计 CSV
 ## 五、单独运行 T6 和附录图 C4
 
 1. 返回仓库的 **Actions** 页面。
-2. 在左侧点击 **2 - T6 and Figure C4 (CPU)**。
+2. 在左侧点击 **2 - One-click T6 and Figure C4 (Windows CPU)**。
 3. 点击 **Run workflow**。
-4. 如果出现分支选择框，保持 **Branch: main**。
-5. 点击绿色的 **Run workflow** 确认启动。
+4. 不填写参数、不选择分支，直接点击绿色的 **Run workflow** 确认启动。
 
 这个任务独立重新训练三年期模型并执行 T6 的 20 次抽样，生成：
 
@@ -116,9 +115,9 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 
 确认当前账号对该仓库有写入权限，并确认工作流位于默认分支 `main`。刷新页面后重新选择左侧的工作流名称。
 
-### GitHub 要求选择分支
+### 为什么没有分支选择说明
 
-选择 `main`。不需要选择其他分支。
+原仓库只保留 `main`，Fork 后也只有 `main`。GitHub 即使显示分支栏，其中也只有默认的 `main`，复现者不需要作出选择。
 
 ### GitHub 要求选择 runner
 
@@ -145,7 +144,7 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 开始前确认：
 
 - 仓库是从 `whyhw-code/LTR-DQN` Fork 得到的。
-- 默认分支是 `main`。
+- 仓库只有 `main`，没有额外分支。
 - 仓库保持 Public。
 - 没有修改 `requirements-lock.txt`、原始数据或工作流。
 - Results 和 T6 分别运行各自的工作流。

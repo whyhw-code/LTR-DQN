@@ -1,4 +1,4 @@
-name: 2 - T6 and Figure C4 (CPU)
+name: 2 - One-click T6 and Figure C4 (Windows CPU)
 
 on:
   workflow_dispatch:
@@ -13,12 +13,21 @@ jobs:
     env:
       MPLBACKEND: Agg
       PYTHONHASHSEED: "0"
+      PYTHONUTF8: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      VECLIB_MAXIMUM_THREADS: "1"
+      BLIS_NUM_THREADS: "1"
+      ATEN_CPU_CAPABILITY: default
+      MKL_CBWR: COMPATIBLE
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           clean: true
           fetch-depth: 1
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: 3.9.13
           architecture: x64
@@ -47,7 +56,7 @@ jobs:
           python T6_main.py
           python Appendix_Fig_main.py --figures C4 --force
       - name: Upload final T6 table, figure and manifests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ltr-dqn-t6-and-c4-${{ github.run_id }}
           path: |

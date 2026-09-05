@@ -172,17 +172,17 @@ an external intermediate file.
 ## GitHub Actions reproduction
 
 1. Open the repository's **Actions** tab.
-2. Select **1 - Results and Figures (CPU)** and choose **Run workflow** for
+2. Select **1 - One-click Results and Figures (Windows CPU)** and choose **Run workflow** for
    T3/T4/T5/T7, all main figures, and Appendix C1/C2/C3/C5.
-3. Select **2 - T6 and Figure C4 (CPU)** and choose **Run workflow** for T6 and
+3. Select **2 - One-click T6 and Figure C4 (Windows CPU)** and choose **Run workflow** for T6 and
    Appendix C4.
 4. Open the completed run and download its artifact. The artifact contains the
    generated workbook, CSVs, figures, and manifests.
 
-Both workflows use a standard Windows Server 2022 x64 CPU runner, Python
-3.9.13, a fixed hash seed, and single-thread settings. The runner is fixed in
-the workflow, so there is no runner choice to make when starting a run. They do
-not require or request a GPU runner.
+The repository has only the `main` branch. Both workflows have no user inputs
+and fix a standard Windows Server 2022 x64 CPU runner, Python 3.9.13, exact
+dependencies, a hash seed, and single-thread settings. The reproducer does not
+choose a branch, operating system, runner, or GPU.
 
 ## Reproducibility notes
 
