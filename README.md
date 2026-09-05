@@ -79,9 +79,10 @@ results/    workbooks, paper CSVs, figure PNGs, and audit CSVs
 - At least 8 GB RAM and 10 GB free disk space are recommended for the full
   all-years run, because the training and figure steps create temporary files.
 
-Important pinned versions include NumPy 1.21.5, pandas 1.4.4, scikit-learn
-1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. The entry points check the locked
-runtime before fitting and stop on a mismatch.
+Important pinned versions include pip 24.1.2, NumPy 1.21.5, pandas 1.4.4,
+scikit-learn 1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. pip 24.1.2 avoids a
+newer `pip check` false positive for the legacy XGBoost Linux wheel. The entry
+points check the locked runtime before fitting and stop on a mismatch.
 
 ## Installation
 
@@ -92,7 +93,7 @@ git clone https://github.com/whyhw-code/LTR-DQN.git
 Set-Location LTR-DQN
 py -3.9 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
 ```
@@ -104,7 +105,7 @@ git clone https://github.com/whyhw-code/LTR-DQN.git
 cd LTR-DQN
 python3.9 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
+python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 export PYTHONHASHSEED=0
 ```

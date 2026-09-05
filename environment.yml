@@ -3,8 +3,9 @@ channels:
   - defaults
 dependencies:
   - python=3.9.13
-  - pip=26.0.1
+  - pip
   - pip:
+      - pip==24.1.2
       - cloudpickle==3.1.2
       - colorama==0.4.6
       - contourpy==1.2.1

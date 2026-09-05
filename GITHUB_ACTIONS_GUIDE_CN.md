@@ -126,7 +126,11 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 
 ### 环境安装失败
 
-打开失败记录，展开 **Install locked environment**，保存完整错误信息。工作流锁定 Python 3.9.13 和依赖版本，安装失败时不要随意升级包版本，否则可能改变结果。
+打开失败记录，展开 **Install locked environment**，保存完整错误信息。工作流锁定 Python 3.9.13、pip 24.1.2 和实验依赖版本，安装失败时不要随意升级包版本，否则可能改变结果。2026 年 9 月 5 日以前 Fork 的版本如果显示 `xgboost 1.7.6 is not supported on this platform`，请先按下方“Fork 后原仓库更新了”同步 `main`，再重新运行。
+
+### Fork 后原仓库更新了
+
+进入你 Fork 的仓库首页。如果分支栏附近显示 **Sync fork**，点击它，再点击 **Update branch**，把原仓库的最新 `main` 同步到自己的 `main`。同步完成后回到 Actions 页面重新运行；不要继续点击旧失败记录中的 **Re-run jobs**，因为旧记录仍使用旧提交。
 
 ### 运行成功但找不到结果
 
@@ -153,4 +157,3 @@ GitHub 官方说明：
 - [启用或禁用工作流](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disabling-and-enabling-a-workflow)
 - [下载工作流 Artifacts](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/downloading-workflow-artifacts)
 - [GitHub Actions 计费说明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
-

@@ -55,7 +55,7 @@ results/    工作簿、CSV、图片和审计文件
 - BLAS、XGBoost 和 PyTorch 固定为单线程，以降低不同机器之间的差异。
 - 完整运行建议至少 8 GB 内存和 10 GB 可用磁盘空间。
 
-主要固定版本：NumPy 1.21.5、pandas 1.4.4、scikit-learn 1.2.0、PyTorch 2.0.0+cpu、XGBoost 1.7.6。入口脚本会在训练前检查环境版本，发现不一致会停止。
+主要固定版本：pip 24.1.2、NumPy 1.21.5、pandas 1.4.4、scikit-learn 1.2.0、PyTorch 2.0.0+cpu、XGBoost 1.7.6。入口脚本会在训练前检查环境版本，发现不一致会停止。固定 pip 24.1.2 是为了避免新版 `pip check` 错误地把 XGBoost 1.7.6 的 Linux wheel 判定为平台不兼容。
 
 ## 环境配置
 
@@ -66,7 +66,7 @@ git clone https://github.com/whyhw-code/LTR-DQN.git
 Set-Location LTR-DQN
 py -3.9 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
 ```
@@ -78,7 +78,7 @@ git clone https://github.com/whyhw-code/LTR-DQN.git
 cd LTR-DQN
 python3.9 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
+python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 export PYTHONHASHSEED=0
 ```
