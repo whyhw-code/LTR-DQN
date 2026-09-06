@@ -380,7 +380,10 @@ def fit_baseline(market: str, train_year: int, model_name: str, seed: int | None
     if classifier:
         y_train = target.to_numpy()
     else:
-        y_train = y_scaler.fit_transform(target)
+        # sklearn regressors expect a one-dimensional target.  Flattening the
+        # scaled column avoids a repeated DataConversionWarning and is
+        # numerically equivalent to sklearn's internal conversion.
+        y_train = y_scaler.fit_transform(target).ravel()
     model = model_for_baseline(model_name, market, train_year, seed)
     model.fit(x_train, y_train)
     predictions = model.predict(x_test)
@@ -1126,7 +1129,6 @@ class Environment():
                 shares_bought = int((capital_per_stock - self.buy_fee_rate) / (100 * row['pclose'])) * 100
                 yu = capital_per_stock - buyfei - shares_bought * row['pclose']
                 if shares_bought == 0:
-                    print(f"Warning: Not enough capital to buy any shares of stock {row['stock_code']} on {self.qid_date}.")
                     yu = capital_per_stock
                 # 计算卖出后的资金
                 sell_value = shares_bought * row['close'] - shares_bought * row['close'] * (self.sell_fee_rate) + yu
