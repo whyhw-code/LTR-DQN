@@ -774,6 +774,41 @@ def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
 
 
 def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
+    def plot_market(market: str, panel: str, path: Path) -> None:
+        fig, axes = plt.subplots(
+            2, 1, figsize=(10.0, 5.5), sharex=False,
+            gridspec_kw={"height_ratios": [3, 1]},
+        )
+        curve_ax, action_ax = axes
+        subset = curves[
+            (curves.market == market)
+            & curves.model.isin([INDEX_NAMES[market], "LambdaMART", "LTR-DQN"])
+        ]
+        for model, group in subset.groupby("model", sort=False):
+            curve_ax.plot(
+                date_values(group.qid_date), group.wealth * 1_000_000,
+                label=model, linewidth=1.8 if model == "LTR-DQN" else 1.45,
+                color=FIG6_COLORS[model],
+            )
+        curve_ax.set_title(f"{panel} {MARKET_TITLES[market]}", fontsize=11, pad=6)
+        curve_ax.set_ylabel("Total return")
+        curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
+        style_axis(curve_ax)
+        actions = pd.read_csv(output_dir / "data" / f"Fig6_{market}_daily_actions.csv")
+        dates = date_values(actions.qid_date)
+        action_ax.bar(dates, actions.number_of_stocks, width=1.0,
+                      color=FIG6_COLORS["action"])
+        action_ax.set_ylim(0, 4.5)
+        action_ax.set_yticks([0, 1, 2, 3, 4])
+        action_ax.set_ylabel("Number of stocks")
+        action_ax.set_xlabel("Trading Day")
+        action_ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+        action_ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        action_ax.tick_params(axis="x", rotation=30)
+        style_axis(action_ax)
+        fig.tight_layout(h_pad=0.6)
+        save_figure(fig, path)
+
     fig, axes = plt.subplots(
         4, 1, figsize=(11.0, 8.2), sharex=False,
         gridspec_kw={"height_ratios": [3, 1, 3, 1]},
@@ -812,7 +847,15 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
     fig.tight_layout()
     path = output_dir / "Fig6_DQN_actions_and_return_curves.png"
     save_figure(fig, path)
-    return [path]
+    separate = [
+        output_dir / "Fig6a_Main_board_actions_and_return.png",
+        output_dir / "Fig6b_ChiNext_actions_and_return.png",
+    ]
+    for market, panel, separate_path in zip(
+        MARKET_ORDER, ("(a)", "(b)"), separate
+    ):
+        plot_market(market, panel, separate_path)
+    return [path, *separate]
 
 
 def minmax(values: np.ndarray) -> np.ndarray:
@@ -892,8 +935,43 @@ def figure7(
         output_dir / "data" / "Fig7_feature_importance.csv",
         seed_config, seed_override, tree_method, force,
     )
-    fig, axes = plt.subplots(1, 2, figsize=(13.0, 8.2), sharex=True)
     model_colors = {"LTR-DQN": "#4472C4", "LR": "#ED7D31", "XGB_R": "#70AD47"}
+    separate = []
+    for market in MARKET_ORDER:
+        fig, ax = plt.subplots(figsize=(7.28, 4.85))
+        market_data = frame[frame.market == market]
+        y_offset = 0
+        ticks = []
+        labels = []
+        for model in ("LTR-DQN", "LR", "XGB_R"):
+            top = market_data[market_data.model == model].nlargest(5, "importance")
+            top = top.sort_values("importance", ascending=True)
+            positions = np.arange(5) + y_offset
+            ax.barh(positions, top.importance, color=model_colors[model], label=model)
+            for position, value in zip(positions, top.importance):
+                ax.text(
+                    float(value) + 0.01, position, f"{value:.2f}",
+                    va="center", ha="left", fontsize=7,
+                )
+            ticks.extend(positions)
+            labels.extend(top.feature)
+            y_offset += 6
+        ax.set_yticks(ticks)
+        ax.set_yticklabels(labels, fontsize=8)
+        ax.set_xlabel("Feature Importance")
+        ax.set_xlim(0, 1.08)
+        style_axis(ax, grid_axis="x")
+        ax.legend(frameon=False, fontsize=8, loc="lower right")
+        fig.tight_layout()
+        path = output_dir / (
+            "Fig7a_Main_board_feature_importance.png"
+            if market == "Main" else "Fig7b_ChiNext_feature_importance.png"
+        )
+        save_figure(fig, path)
+        separate.append(path)
+    # Keep a combined copy for existing callers while the separate files
+    # match the manuscript's two standalone panels.
+    combined_fig, axes = plt.subplots(1, 2, figsize=(13.0, 8.2), sharex=True)
     for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
         market_data = frame[frame.market == market]
         y_offset = 0
@@ -904,19 +982,16 @@ def figure7(
             top = top.sort_values("importance", ascending=True)
             positions = np.arange(5) + y_offset
             ax.barh(positions, top.importance, color=model_colors[model], label=model)
-            ticks.extend(positions)
-            labels.extend(top.feature)
-            y_offset += 6
-        ax.set_yticks(ticks)
-        ax.set_yticklabels(labels, fontsize=8)
+            ticks.extend(positions); labels.extend(top.feature); y_offset += 6
+        ax.set_yticks(ticks); ax.set_yticklabels(labels, fontsize=8)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_xlabel("Normalized feature importance")
+        ax.set_xlabel("Feature Importance")
         style_axis(ax, grid_axis="x")
         ax.legend(frameon=False, fontsize=8, loc="lower right")
-    fig.tight_layout()
-    path = output_dir / "Fig7_feature_importance.png"
-    save_figure(fig, path)
-    return [path]
+    combined_fig.tight_layout()
+    combined = output_dir / "Fig7_feature_importance.png"
+    save_figure(combined_fig, combined)
+    return [combined, *separate]
 
 
 def main() -> None:
