@@ -297,7 +297,7 @@ def make_ranker(market: str, model_name: str, seed: int, tree_method: str) -> xg
 
 def train_predict_temp(
     all_df: pd.DataFrame, market: str, rate: float, seed: int, model_name: str,
-    use_gpu: bool = True, require_gpu: bool = False,
+    use_gpu: bool = False, require_gpu: bool = False,
 ) -> pd.DataFrame:
     set_seed(seed)
     if rate < 1.0:
@@ -370,7 +370,7 @@ def load_select_map(path: Path, market: str) -> dict[int, int]:
 def run_sampling(
     data_dir: Path, seed_path: Path, select_map_path: Path,
     output_path: Path, markets: list[str] | None = None,
-    max_seeds: int | None = None, use_gpu: bool = True,
+    max_seeds: int | None = None, use_gpu: bool = False,
     resume: bool = True, include_full_rate: bool = True,
     dqn_seed_path: Path | None = None, require_gpu: bool = False,
     full_rate_path: Path | None = None,
