@@ -792,6 +792,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
             )
         curve_ax.set_title(f"{panel} {MARKET_TITLES[market]}", fontsize=11, pad=6)
         curve_ax.set_ylabel("Total return")
+        curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
         style_axis(curve_ax)
         actions = pd.read_csv(output_dir / "data" / f"Fig6_{market}_daily_actions.csv")
@@ -831,6 +832,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
             loc="left", fontsize=11,
         )
         curve_ax.set_ylabel("Total return")
+        curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
         style_axis(curve_ax)
         actions = pd.read_csv(output_dir / "data" / f"Fig6_{market}_daily_actions.csv")
