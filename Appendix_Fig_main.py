@@ -41,6 +41,7 @@ from experiment_core import (
     validate_runtime,
 )
 from T6_main import T6_REPLICATIONS
+from runtime_config import ESG_THRESHOLDS
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -56,7 +57,7 @@ COLORS = {
     "ChiNext": "#D28E00",
     "index": "#777777",
     "Baseline portfolio": "#4472C4",
-    "No ESG": "#C00000",
+    "No ESG": "#FF0000",
     "NS 25%": "#E6A700",
     "NS 50%": "#ED7D31",
     "PI 25%": "#70AD47",
@@ -358,20 +359,27 @@ def compute_c1(data_path: Path, force: bool) -> pd.DataFrame:
 
 
 def plot_c1(frame: pd.DataFrame, path: Path) -> None:
+    # Figure C1 uses distinct manuscript colours for each market/series.
+    c1_colors = {
+        ("Main", "CSI 300 Index"): "#FFD966",
+        ("Main", "Baseline portfolio"): "#2E75B6",
+        ("ChiNext", "ChiNext Index"): "#A5A5A5",
+        ("ChiNext", "Baseline portfolio"): "#ED7D31",
+    }
     fig, axes = plt.subplots(2, 1, figsize=(11.2, 6.8), sharex=False)
     for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
         subset = frame[frame.market == market]
         for model, group in subset.groupby("model", sort=False):
-            color = COLORS["Baseline portfolio"] if model == "Baseline portfolio" else COLORS["index"]
+            color = c1_colors[(market, model)]
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=model, linewidth=1.7, color=color)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_ylabel("Total fund (million)")
+        ax.set_ylabel("Total Fund (million)")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
         ax.legend(frameon=False, fontsize=8, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading day")
+    axes[-1].set_xlabel("Trading Day")
     fig.tight_layout()
     save_figure(fig, path)
 
@@ -522,13 +530,13 @@ def plot_c3(frame: pd.DataFrame, path: Path) -> None:
         for color, (scenario, group) in zip(scenario_colors, subset.groupby("scenario", sort=False)):
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=scenario, color=color, linewidth=1.5)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_ylabel("Total fund (million)")
+        ax.set_ylabel("Total Fund (million)")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
         ax.legend(frameon=False, fontsize=7, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading day")
+    axes[-1].set_xlabel("Trading Day")
     fig.tight_layout()
     save_figure(fig, path)
 
@@ -592,10 +600,10 @@ def plot_c4(frame: pd.DataFrame, path: Path) -> None:
             bp["boxes"][0].set_label(model)
         ax.set_xticks(positions, [f"{int(rate * 100)}%" for rate in RATES])
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_ylabel("Annualized return")
+        ax.set_ylabel("Annualized Return")
         ax.legend(frameon=True, fontsize=8, loc="upper right")
         style_axis(ax)
-    axes[-1].set_xlabel("Sampling rate")
+    axes[-1].set_xlabel("Sampling Rate")
     fig.tight_layout()
     save_figure(fig, path)
 
@@ -661,10 +669,10 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
             INDEX_NAMES[market]: index,
             "Baseline portfolio": baseline,
             "No ESG": esg_curve(esg, actions, threshold=None, prefilter=False),
-            "NS 25%": esg_curve(esg, actions, threshold=5.52, prefilter=False),
-            "NS 50%": esg_curve(esg, actions, threshold=6.02, prefilter=False),
-            "PI 25%": esg_curve(esg, actions, threshold=5.52, prefilter=True),
-            "PI 50%": esg_curve(esg, actions, threshold=6.02, prefilter=True),
+            "NS 25%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["25%"], prefilter=False),
+            "NS 50%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["50%"], prefilter=False),
+            "PI 25%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["25%"], prefilter=True),
+            "PI 50%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["50%"], prefilter=True),
         }
         for strategy, curve in curves.items():
             part = normalize_funds(curve)
@@ -682,13 +690,13 @@ def plot_c5(frame: pd.DataFrame, path: Path) -> None:
             color = COLORS.get(strategy, COLORS["index"])
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=strategy, color=color, linewidth=1.5)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_ylabel("Total fund (million)")
+        ax.set_ylabel("Total Fund (million)")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
         ax.legend(frameon=False, fontsize=7, ncol=4, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading day")
+    axes[-1].set_xlabel("Trading Day")
     fig.tight_layout()
     save_figure(fig, path)
 

@@ -78,8 +78,9 @@ F4_SENSITIVITY_FIXED = {
     "ChiNext": {"learning_rate": {"reg_lambda": 10.0}},
 }
 COLORS = {
-    "Main": "#2F5597",
-    "ChiNext": "#D28E00",
+    # Manuscript colours for the two-market sensitivity panels (Figures 3-4).
+    "Main": "#4472C4",
+    "ChiNext": "#FFC000",
     "LTR-DQN": "#C00000",
     "LambdaMART": "#4472C4",
     "LambdaRank": "#70AD47",
@@ -268,8 +269,6 @@ def fit_ranker_variant(
         "learning_rate": learning_rate,
         "max_depth": max_depth,
         "n_estimators": n_estimators,
-        "lambdarank_num_pair_per_sample": 8,
-        "lambdarank_pair_method": "topk",
         "random_state": seed,
         "n_jobs": 1,
     }
@@ -761,7 +760,7 @@ def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
             color = FIG5_COLORS[model]
             ax.plot(dates, group.wealth, label=model, linewidth=linewidth, color=color)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_ylabel("Cumulative wealth (initial = 1)")
+        ax.set_ylabel("Total Fund (million)")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
@@ -788,7 +787,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         ]
         for model, group in subset.groupby("model", sort=False):
             curve_ax.plot(
-                date_values(group.qid_date), group.wealth, label=model,
+                date_values(group.qid_date), group.wealth * 1_000_000, label=model,
                 linewidth=2.1 if model == "LTR-DQN" else 1.4,
                 color=FIG6_COLORS[model],
             )
@@ -796,7 +795,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
             f"({'a' if index == 0 else 'b'}) {MARKET_TITLES[market]}",
             loc="left", fontsize=11,
         )
-        curve_ax.set_ylabel("Cumulative wealth")
+        curve_ax.set_ylabel("Total return")
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
         style_axis(curve_ax)
         actions = pd.read_csv(output_dir / "data" / f"Fig6_{market}_daily_actions.csv")
@@ -804,8 +803,8 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         action_ax.bar(dates, actions.number_of_stocks, width=1.0, color=FIG6_COLORS["action"])
         action_ax.set_ylim(0, 4.5)
         action_ax.set_yticks([0, 1, 2, 3, 4])
-        action_ax.set_ylabel("Stocks")
-        action_ax.set_xlabel("Trading day")
+        action_ax.set_ylabel("Number of stocks")
+        action_ax.set_xlabel("Trading Day")
         action_ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         action_ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         action_ax.tick_params(axis="x", rotation=30)

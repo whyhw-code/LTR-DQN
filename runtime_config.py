@@ -22,6 +22,16 @@ os.environ["MKL_CBWR"] = "COMPATIBLE"
 
 DEFAULT_DEVICE = "cpu"
 
+# ESG sensitivity thresholds used by Table 7 and Appendix Figure C5.  The
+# paired NS/PI strategies intentionally share one threshold at each level so
+# that changing a threshold cannot desynchronise the table and its figure.
+# These values are computed from the supplied ESG scores at runtime; no
+# intermediate portfolio or result is fixed here.
+ESG_THRESHOLDS = {
+    "25%": 5.80,
+    "50%": 6.00,
+}
+
 
 DEFAULT_TRAINING_SEEDS = {
     "0060": 40,

@@ -325,8 +325,6 @@ def fit_ranker(
         "tree_method": tree_method,
         "random_state": int(seed),
         "n_jobs": 1,
-        "lambdarank_num_pair_per_sample": 8,
-        "lambdarank_pair_method": "topk",
         "booster": "gbtree",
         "eval_metric": "ndcg",
     }

@@ -30,7 +30,12 @@ from experiment_core import (
     validate_runtime,
     write_results,
 )
-from runtime_config import load_stage_seed_config, set_global_determinism, stage_seed
+from runtime_config import (
+    ESG_THRESHOLDS,
+    load_stage_seed_config,
+    set_global_determinism,
+    stage_seed,
+)
 
 
 BASELINES = ("LR", "MLP_R", "SVM_R", "XGB_R", "SVM_C", "MLP_C", "XGB_C")
@@ -366,10 +371,10 @@ def run_table7(
         ))
         records.append(metric_record("T7", market, "LTR-DQN without ESG", dqn_metrics, 3))
         for label, threshold, prefilter in (
-            ("NS 25%", 5.52, False),
-            ("NS 50%", 6.02, False),
-            ("PI 25%", 5.52, True),
-            ("PI 50%", 6.02, True),
+            ("NS 25%", ESG_THRESHOLDS["25%"], False),
+            ("NS 50%", ESG_THRESHOLDS["50%"], False),
+            ("PI 25%", ESG_THRESHOLDS["25%"], True),
+            ("PI 50%", ESG_THRESHOLDS["50%"], True),
         ):
             records.append(metric_record(
                 "T7", market, label,
