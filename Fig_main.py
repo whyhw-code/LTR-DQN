@@ -86,6 +86,33 @@ COLORS = {
     "index": "#666666",
 }
 
+# Figures 5 and 6 in the manuscript use the original Matplotlib colour cycle.
+# Keep this mapping local to those figures so the sensitivity panels retain
+# their existing palette.
+FIG5_COLORS = {
+    "CSI 300 Index": "#1f77b4",
+    "ChiNext Index": "#1f77b4",
+    "Baseline portfolio": "#ff7f0e",
+    "LR": "#2ca02c",
+    "MLP_R": "#d62728",
+    "SVM_R": "#9467bd",
+    "XGB_R": "#8c564b",
+    "SVM_C": "#e377c2",
+    "MLP_C": "#7f7f7f",
+    "XGB_C": "#bcbd22",
+    "LambdaRank": "#17becf",
+    "LambdaMART": "#1f77b4",
+    "LTR-DQN": "#ff7f0e",
+}
+
+FIG6_COLORS = {
+    "LambdaMART": "#1f77b4",
+    "LTR-DQN": "#ff7f0e",
+    "CSI 300 Index": "#2ca02c",
+    "ChiNext Index": "#2ca02c",
+    "action": "#1f77b4",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -731,7 +758,7 @@ def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         for model, group in subset.groupby("model", sort=False):
             dates = date_values(group.qid_date)
             linewidth = 2.4 if model == "LTR-DQN" else 1.15
-            color = COLORS.get(model)
+            color = FIG5_COLORS[model]
             ax.plot(dates, group.wealth, label=model, linewidth=linewidth, color=color)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
         ax.set_ylabel("Cumulative wealth (initial = 1)")
@@ -763,7 +790,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
             curve_ax.plot(
                 date_values(group.qid_date), group.wealth, label=model,
                 linewidth=2.1 if model == "LTR-DQN" else 1.4,
-                color=COLORS.get(model, COLORS["index"]),
+                color=FIG6_COLORS[model],
             )
         curve_ax.set_title(
             f"({'a' if index == 0 else 'b'}) {MARKET_TITLES[market]}",
@@ -774,7 +801,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         style_axis(curve_ax)
         actions = pd.read_csv(output_dir / "data" / f"Fig6_{market}_daily_actions.csv")
         dates = date_values(actions.qid_date)
-        action_ax.bar(dates, actions.number_of_stocks, width=1.0, color="#A5A5A5")
+        action_ax.bar(dates, actions.number_of_stocks, width=1.0, color=FIG6_COLORS["action"])
         action_ax.set_ylim(0, 4.5)
         action_ax.set_yticks([0, 1, 2, 3, 4])
         action_ax.set_ylabel("Stocks")
