@@ -950,21 +950,19 @@ def figure7(
             top = top.sort_values("importance", ascending=True)
             positions = np.arange(5) + y_offset
             ax.barh(positions, top.importance, color=model_colors[model], label=model)
-            for position, value in zip(positions, top.importance):
-                ax.text(
-                    float(value) + 0.01, position, f"{value:.2f}",
-                    va="center", ha="left", fontsize=7,
-                )
             ticks.extend(positions)
             labels.extend(top.feature)
             y_offset += 6
         ax.set_yticks(ticks)
         ax.set_yticklabels(labels, fontsize=8)
-        ax.set_xlabel("Feature Importance")
-        ax.set_xlim(0, 1.08)
+        ax.set_xlabel("Normalized feature importance")
+        ax.set_xlim(0, 1.05)
         style_axis(ax, grid_axis="x")
-        ax.legend(frameon=False, fontsize=8, loc="lower right")
-        fig.tight_layout()
+        ax.legend(
+            frameon=False, fontsize=8, ncol=3, loc="upper center",
+            bbox_to_anchor=(0.5, -0.14), borderaxespad=0.0,
+        )
+        fig.subplots_adjust(left=0.23, right=0.98, top=0.92, bottom=0.22)
         path = output_dir / (
             "Fig7a_Main_board_feature_importance.png"
             if market == "Main" else "Fig7b_ChiNext_feature_importance.png"
@@ -974,6 +972,7 @@ def figure7(
     # Keep a combined copy for existing callers while the separate files
     # match the manuscript's two standalone panels.
     combined_fig, axes = plt.subplots(1, 2, figsize=(13.0, 8.2), sharex=True)
+    handles = labels_for_legend = None
     for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
         market_data = frame[frame.market == market]
         y_offset = 0
@@ -987,10 +986,15 @@ def figure7(
             ticks.extend(positions); labels.extend(top.feature); y_offset += 6
         ax.set_yticks(ticks); ax.set_yticklabels(labels, fontsize=8)
         ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
-        ax.set_xlabel("Feature Importance")
+        ax.set_xlabel("Normalized feature importance")
         style_axis(ax, grid_axis="x")
-        ax.legend(frameon=False, fontsize=8, loc="lower right")
-    combined_fig.tight_layout()
+        if handles is None:
+            handles, labels_for_legend = ax.get_legend_handles_labels()
+    combined_fig.legend(
+        handles, labels_for_legend, frameon=False, fontsize=8, ncol=3,
+        loc="lower center", bbox_to_anchor=(0.5, 0.015),
+    )
+    combined_fig.subplots_adjust(left=0.12, right=0.98, top=0.94, bottom=0.13, wspace=0.20)
     combined = output_dir / "Fig7_feature_importance.png"
     save_figure(combined_fig, combined)
     return [combined, *separate]
