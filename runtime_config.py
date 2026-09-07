@@ -28,8 +28,8 @@ DEFAULT_DEVICE = "cpu"
 # These values are computed from the supplied ESG scores at runtime; no
 # intermediate portfolio or result is fixed here.
 ESG_THRESHOLDS = {
-    "25%": 5.80,
-    "50%": 6.00,
+    "25%": 6.00,
+    "50%": 5.80,
 }
 
 
