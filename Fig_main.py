@@ -752,14 +752,14 @@ def date_values(values: pd.Series) -> pd.Series:
 
 def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
     fig, axes = plt.subplots(2, 1, figsize=(11.5, 8.0), sharex=False)
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+    for ax, market in zip(axes, MARKET_ORDER):
         subset = curves[curves.market == market]
         for model, group in subset.groupby("model", sort=False):
             dates = date_values(group.qid_date)
             linewidth = 2.4 if model == "LTR-DQN" else 1.15
             color = FIG5_COLORS[model]
             ax.plot(dates, group.wealth, label=model, linewidth=linewidth, color=color)
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
         ax.set_ylabel("Total Fund (million)")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
@@ -774,7 +774,7 @@ def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
 
 
 def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
-    def plot_market(market: str, panel: str, path: Path) -> None:
+    def plot_market(market: str, path: Path) -> None:
         fig, axes = plt.subplots(
             2, 1, figsize=(10.0, 5.5), sharex=False,
             gridspec_kw={"height_ratios": [3, 1]},
@@ -790,7 +790,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
                 label=model, linewidth=1.8 if model == "LTR-DQN" else 1.45,
                 color=FIG6_COLORS[model],
             )
-        curve_ax.set_title(f"{panel} {MARKET_TITLES[market]}", fontsize=11, pad=6)
+        curve_ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11, pad=6)
         curve_ax.set_ylabel("Total return")
         curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
@@ -827,10 +827,7 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
                 linewidth=2.1 if model == "LTR-DQN" else 1.4,
                 color=FIG6_COLORS[model],
             )
-        curve_ax.set_title(
-            f"({'a' if index == 0 else 'b'}) {MARKET_TITLES[market]}",
-            loc="left", fontsize=11,
-        )
+        curve_ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
         curve_ax.set_ylabel("Total return")
         curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
@@ -853,10 +850,8 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         output_dir / "Fig6a_Main_board_actions_and_return.png",
         output_dir / "Fig6b_ChiNext_actions_and_return.png",
     ]
-    for market, panel, separate_path in zip(
-        MARKET_ORDER, ("(a)", "(b)"), separate
-    ):
-        plot_market(market, panel, separate_path)
+    for market, separate_path in zip(MARKET_ORDER, separate):
+        plot_market(market, separate_path)
     return [path, *separate]
 
 
