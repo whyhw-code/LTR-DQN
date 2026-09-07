@@ -955,6 +955,7 @@ def figure7(
             y_offset += 6
         ax.set_yticks(ticks)
         ax.set_yticklabels(labels, fontsize=8)
+        ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
         ax.set_xlabel("Normalized feature importance")
         ax.set_xlim(0, 1.05)
         style_axis(ax, grid_axis="x")
@@ -973,7 +974,7 @@ def figure7(
     # match the manuscript's two standalone panels.
     combined_fig, axes = plt.subplots(1, 2, figsize=(13.0, 8.2), sharex=True)
     handles = labels_for_legend = None
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+    for ax, market in zip(axes, MARKET_ORDER):
         market_data = frame[frame.market == market]
         y_offset = 0
         ticks = []
@@ -985,7 +986,7 @@ def figure7(
             ax.barh(positions, top.importance, color=model_colors[model], label=model)
             ticks.extend(positions); labels.extend(top.feature); y_offset += 6
         ax.set_yticks(ticks); ax.set_yticklabels(labels, fontsize=8)
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
         ax.set_xlabel("Normalized feature importance")
         style_axis(ax, grid_axis="x")
         if handles is None:
