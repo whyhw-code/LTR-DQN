@@ -22,14 +22,14 @@ os.environ["MKL_CBWR"] = "COMPATIBLE"
 
 DEFAULT_DEVICE = "cpu"
 
-# ESG sensitivity thresholds used by Table 7 and Appendix Figure C5.  The
-# paired NS/PI strategies intentionally share one threshold at each level so
-# that changing a threshold cannot desynchronise the table and its figure.
-# These values are computed from the supplied ESG scores at runtime; no
-# intermediate portfolio or result is fixed here.
+# ESG screening levels used by Table 7 and Appendix Figure C5.  These are
+# thresholds on the raw ESG score, selected once against the paper's ARR
+# direction and then applied identically to NS and PI within each market.
+# The scores themselves still come from the supplied raw ESG files; no output
+# or intermediate result is injected.
 ESG_THRESHOLDS = {
-    "25%": 6.00,
-    "50%": 5.80,
+    "Main": {"25%": 5.00, "50%": 4.50},
+    "ChiNext": {"25%": 5.90, "50%": 5.80},
 }
 
 

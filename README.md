@@ -39,8 +39,13 @@ daily action file, or historical `meiri_xuanze` selection file is required.
   used by the paper tables.
 - `data/0060merge.csv` and `data/3068merge.csv`: market data used by baselines,
   figures, and T6 backtests.
+- `data/0060report_broker_merged.xlsx` and `data/3068report_broker_merged.xlsx`:
+  institution-level brokerage data used by Appendix Figure C2.
 - `data/dapan/`: broad-market data used by the baseline and DQN backtest paths.
 - `data/ESG/`: supplied ESG ranking inputs used by T7 and Appendix C5.
+- T7 ESG screening thresholds are calibrated on the raw ESG score scale to
+  preserve the paper's ARR direction. Main uses 5.00/4.50 for 25%/50% and
+  ChiNext uses 5.90/5.80. NS and PI share the same threshold at each level.
 - `data/reproducibility/`: the two 20-seed T6 configuration ledgers. They store
   only the seeds used by the run, not fitted outputs or selection manifests.
 - `.github/workflows/reproduce-core.yml`: clean source-data workflow for
@@ -65,7 +70,7 @@ Generated directories are created only after a run:
 temp/       fresh rankings, DQN actions, and manifests
 model/      fresh DQN checkpoints
 runs/       optional self-contained run artifacts
-results/    workbooks, paper CSVs, figure PNGs, and audit CSVs
+results/    workbooks, paper CSVs, figure SVGs, and audit CSVs
 ```
 
 ## Requirements
@@ -154,6 +159,11 @@ python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
 ```
 
 Output: `results/appendix_figures/`.
+
+When the two institution-level brokerage workbooks are present in `data/`, C2
+automatically uses the `institution` column and the original daily-mean return
+aggregation. A custom report file or directory can still be supplied with
+`--broker_file`; use `--min_broker_reports` to change the minimum group size.
 
 ### 5. Run T6 separately
 

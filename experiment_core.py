@@ -23,6 +23,7 @@ from sklearn.svm import SVC, SVR
 
 from runtime_config import (
     configure_torch_threads,
+    ESG_THRESHOLDS,
     LOCKED_RUNTIME,
     market_seed,
     set_global_determinism,
@@ -62,6 +63,26 @@ MARKETS = {"Main": "0060", "ChiNext": "3068"}
 # The paper's LTR-DQN pipeline uses LambdaMART ranking scores as the DQN
 # state input. LambdaRank remains an independent ranking-only baseline.
 DQN_RANKER = "LambdaMART"
+
+
+def esg_thresholds_for_market(market: str) -> dict[str, float]:
+    """Return calibrated ESG thresholds after validating raw ESG coverage."""
+    code = MARKETS.get(market, market)
+    path = DATA_DIR / "ESG" / f"{code}temp_test_ndcg_train3_esg.csv"
+    if not path.is_file():
+        raise FileNotFoundError(f"T7 ESG data not found: {path}")
+    values = pd.to_numeric(pd.read_csv(path, usecols=["ESG"])["ESG"], errors="coerce").dropna()
+    if values.empty:
+        raise ValueError(f"T7 ESG data has no numeric ESG values: {path}")
+    thresholds = ESG_THRESHOLDS.get(market)
+    if thresholds is None:
+        raise ValueError(f"No ESG thresholds configured for market: {market}")
+    result = {label: float(value) for label, value in thresholds.items()}
+    if set(result) != {"25%", "50%"} or result["25%"] <= result["50%"]:
+        raise ValueError(f"Invalid ESG threshold ordering for {market}: {result}")
+    if any(value < float(values.min()) or value > float(values.max()) for value in result.values()):
+        raise ValueError(f"ESG thresholds outside raw score range for {market}: {result}")
+    return result
 
 
 def artifact_dir(run_dir: Path, kind: str) -> Path:
@@ -1594,4 +1615,3 @@ class T4ExcelWriter:
                 f"[T4ExcelWriter] Updated {updated_count} rows: "
                 f"sheet={sheet_name}, column={count_target_col}"
             )
-

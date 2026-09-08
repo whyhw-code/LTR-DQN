@@ -21,6 +21,7 @@ from experiment_core import (
     backtest_predictions,
     dqn_ranking_path,
     esg_metrics,
+    esg_thresholds_for_market,
     evaluate_dqn,
     fit_baseline,
     index_metrics,
@@ -31,7 +32,6 @@ from experiment_core import (
     write_results,
 )
 from runtime_config import (
-    ESG_THRESHOLDS,
     load_stage_seed_config,
     set_global_determinism,
     stage_seed,
@@ -370,11 +370,12 @@ def run_table7(
             "T7", market, "Baseline portfolios", all_stock_metrics(market, start_date=20211206), 3
         ))
         records.append(metric_record("T7", market, "LTR-DQN without ESG", dqn_metrics, 3))
+        thresholds = esg_thresholds_for_market(market)
         for label, threshold, prefilter in (
-            ("NS 25%", ESG_THRESHOLDS["25%"], False),
-            ("NS 50%", ESG_THRESHOLDS["50%"], False),
-            ("PI 25%", ESG_THRESHOLDS["25%"], True),
-            ("PI 50%", ESG_THRESHOLDS["50%"], True),
+            ("NS 25%", thresholds["25%"], False),
+            ("NS 50%", thresholds["50%"], False),
+            ("PI 25%", thresholds["25%"], True),
+            ("PI 50%", thresholds["50%"], True),
         ):
             records.append(metric_record(
                 "T7", market, label,
@@ -469,4 +470,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

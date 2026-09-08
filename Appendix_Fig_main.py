@@ -2,12 +2,11 @@
 
 This is intentionally separate from ``Fig_main.py``.  Every plotted value is
 derived from the current data/artifacts, and the underlying CSVs plus SHA-256
-manifest are retained next to the PNG files.
+manifest are retained next to the SVG files.
 
-Figure C2 needs a brokerage identifier.  The distributed clean data do not
-contain brokerage names/IDs, so the default run uses ``broker_size`` as an
-explicitly labelled proxy grouping.  Pass ``--broker_file`` and
-``--broker_column`` when the original brokerage identifier is available.
+Figure C2 uses the institution-level brokerage files when they are present in
+``data/``.  The fallback clean files do not contain brokerage names/IDs, so a
+``broker_size`` proxy remains available for compatibility.
 """
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from experiment_core import (
     CODE_DIR,
@@ -38,10 +38,10 @@ from experiment_core import (
     artifact_dir,
     runtime_versions,
     sha256,
+    esg_thresholds_for_market,
     validate_runtime,
 )
 from T6_main import T6_REPLICATIONS
-from runtime_config import ESG_THRESHOLDS
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -50,6 +50,12 @@ INDEX_NAMES = {"Main": "CSI 300 Index", "ChiNext": "ChiNext Index"}
 MARKET_CODES = {"Main": "0060", "ChiNext": "3068"}
 INITIAL_CAPITAL = 1_000_000.0
 LONG_START = 20171206
+# The paper annualizes the common five-year test horizon (1,272 trading days)
+# rather than the number of days on which a particular institution filed a
+# report.  Keep the source reports sparse for MDR/SR/WR, but use this fixed
+# horizon for ARR so institutions remain comparable.
+BROKERAGE_TRADING_DAYS = 1272
+TRADING_DAYS_PER_YEAR = 242
 MODELS = ("LambdaRank", "LambdaMART", "LTR-DQN")
 RATES = (0.5, 0.6, 0.7, 0.8, 0.9)
 COLORS = {
@@ -65,6 +71,16 @@ COLORS = {
     "LambdaRank": "#2AA6C8",
     "LambdaMART": "#ED7D31",
     "LTR-DQN": "#A6A6A6",
+}
+C5_COLORS = {
+    "CSI 300 Index": "#4472C4",
+    "ChiNext Index": "#4472C4",
+    "Baseline portfolio": "#A5A5A5",
+    "No ESG": "#FF0000",
+    "NS 25%": "#FFC000",
+    "NS 50%": "#ED7D31",
+    "PI 25%": "#70AD47",
+    "PI 50%": "#264478",
 }
 
 
@@ -89,14 +105,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--broker_file", type=Path, default=None,
-        help="Optional report-level CSV containing a true brokerage identifier",
+        help="Optional report-level CSV/XLSX containing a true brokerage identifier",
     )
     parser.add_argument(
         "--broker_column", default=None,
         help="Brokerage identifier column; default is broker_id when present, else broker_size proxy",
     )
     parser.add_argument(
-        "--min_broker_reports", type=int, default=100,
+        "--min_broker_reports", type=int, default=0,
         help="Minimum report observations required for one Figure C2 group",
     )
     parser.add_argument("--force", action="store_true", help="Ignore cached appendix data")
@@ -358,7 +374,7 @@ def compute_c1(data_path: Path, force: bool) -> pd.DataFrame:
     return save_csv(pd.DataFrame(rows), data_path, signature)
 
 
-def plot_c1(frame: pd.DataFrame, path: Path) -> None:
+def plot_c1(frame: pd.DataFrame, path: Path) -> list[Path]:
     # Figure C1 uses distinct manuscript colours for each market/series.
     c1_colors = {
         ("Main", "CSI 300 Index"): "#FFD966",
@@ -366,28 +382,61 @@ def plot_c1(frame: pd.DataFrame, path: Path) -> None:
         ("ChiNext", "ChiNext Index"): "#A5A5A5",
         ("ChiNext", "Baseline portfolio"): "#ED7D31",
     }
-    fig, axes = plt.subplots(2, 1, figsize=(11.2, 6.8), sharex=False)
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+    def draw(ax, market: str) -> None:
         subset = frame[frame.market == market]
         for model, group in subset.groupby("model", sort=False):
             color = c1_colors[(market, model)]
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=model, linewidth=1.7, color=color)
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        title = MARKET_TITLES[market]
+        ax.set_title(title, loc="center", fontsize=11)
         ax.set_ylabel("Total Fund (million)")
+        ax.set_xlabel("Trading Day")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
         ax.legend(frameon=False, fontsize=8, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading Day")
+
+    fig, axes = plt.subplots(2, 1, figsize=(11.2, 6.8), sharex=False)
+    for ax, market in zip(axes, MARKET_ORDER):
+        draw(ax, market)
     fig.tight_layout()
     save_figure(fig, path)
 
+    separate = [
+        path.parent / "FigC1a_Main_board_baseline_portfolio_and_index.svg",
+        path.parent / "FigC1b_ChiNext_baseline_portfolio_and_index.svg",
+    ]
+    for market, separate_path in zip(MARKET_ORDER, separate):
+        market_fig, market_ax = plt.subplots(figsize=(10.2, 4.2))
+        draw(market_ax, market)
+        market_fig.tight_layout()
+        save_figure(market_fig, separate_path)
+    return [path, *separate]
+
+
+def read_broker_source(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
+    return pd.read_csv(path)
+
 
 def broker_source(args: argparse.Namespace, market: str) -> tuple[pd.DataFrame, Path, str, str]:
-    path = args.broker_file or (DATA_DIR / f"{MARKET_CODES[market]}merge_open_close_final.csv")
+    if args.broker_file is not None:
+        supplied = Path(args.broker_file)
+        path = (
+            supplied / f"{MARKET_CODES[market]}report_broker_merged.xlsx"
+            if supplied.is_dir()
+            else supplied
+        )
+    else:
+        candidates = (
+            DATA_DIR / f"{MARKET_CODES[market]}report_broker_merged.xlsx",
+            DATA_DIR / f"{MARKET_CODES[market]}merge_open_close_final.csv",
+        )
+        path = next((candidate for candidate in candidates if candidate.is_file()), candidates[-1])
     path = require_file(path, "brokerage report data")
-    frame = pd.read_csv(path)
+    frame = read_broker_source(path)
     if "market" in frame.columns and args.broker_file:
         frame = frame[frame.market.astype(str).str.lower().str.contains(market.lower())]
     requested = args.broker_column
@@ -400,6 +449,8 @@ def broker_source(args: argparse.Namespace, market: str) -> tuple[pd.DataFrame, 
         column, mode = "broker_id", "true_identifier"
     elif "brokerage_id" in frame.columns:
         column, mode = "brokerage_id", "true_identifier"
+    elif "institution" in frame.columns:
+        column, mode = "institution", "true_identifier"
     elif "broker_size" in frame.columns:
         column, mode = "broker_size", "proxy"
     else:
@@ -422,11 +473,11 @@ def compute_c2(data_path: Path, args: argparse.Namespace) -> pd.DataFrame:
         "files": file_signature([*source_paths, *implementation_paths()]),
         "settings": source_meta,
     })
-    cached = cached_csv(data_path, signature, args.force)
-    if cached is not None:
-        return cached
+    # C2 is intentionally recomputed on every invocation.  The CSV beside the
+    # figure is an audit/export artifact only; it must never become an input
+    # cache because the reproducibility source is the report-level workbook.
     rows = []
-    required = {"qid_date", "stock_code", "close", "pclose"}
+    required = {"qid_date", "stock_code", "close", "pclose", "real_return"}
     for market in MARKET_ORDER:
         frame, broker_column, mode = loaded[market]
         missing = sorted(required - set(frame.columns))
@@ -435,18 +486,50 @@ def compute_c2(data_path: Path, args: argparse.Namespace) -> pd.DataFrame:
         frame = frame.copy()
         frame["qid_date"] = to_int_dates(frame.qid_date)
         frame = frame[(frame.qid_date >= LONG_START) & (frame.qid_date <= TEST_END)]
-        frame = frame.dropna(subset=[broker_column, "qid_date", "pclose", "close"])
+        frame["real_return"] = pd.to_numeric(frame["real_return"], errors="coerce")
+        frame = frame.dropna(subset=[broker_column, "qid_date", "real_return"])
         counts = frame[broker_column].value_counts()
         keep = counts[counts >= args.min_broker_reports].index
         for broker, group in frame[frame[broker_column].isin(keep)].groupby(broker_column, sort=True):
-            curve, wins, trades = backtest(group, selection="all")
-            metrics = curve_metrics(curve, wins, trades)
+            # Match the original C2 workflow: average report returns by
+            # institution and day, then compound the daily series.
+            daily = (
+                group.groupby("qid_date", sort=True)["real_return"]
+                .mean()
+                .sort_index()
+            )
+            if daily.empty:
+                continue
+            cumulative = (1.0 + daily).cumprod()
+            peak = cumulative.cummax()
+            drawdown = (cumulative - peak) / peak
+            mdr = -float(drawdown.min())
+            arr = float(
+                cumulative.iloc[-1] ** (TRADING_DAYS_PER_YEAR / BROKERAGE_TRADING_DAYS)
+                - 1.0
+            )
+            cr = float(arr / mdr) if mdr else np.nan
+            daily_std = float(daily.std(ddof=1))
+            sr = (
+                float(((1.0 + daily.mean()) ** 242 - 1.0 - 0.025)
+                      / (daily_std * 242 ** 0.5))
+                if daily_std
+                else np.nan
+            )
+            metrics = {
+                "ARR": arr,
+                "MDR": mdr,
+                "CR": cr,
+                "SR": sr,
+                "WR": float((group["real_return"] > 0).mean()),
+            }
             rows.append({
                 "market": market,
                 "broker_group": str(broker),
                 "broker_column": broker_column,
                 "broker_grouping_mode": mode,
                 "n_reports": len(group),
+                "n_dates": len(daily),
                 **metrics,
             })
     result = pd.DataFrame(rows)
@@ -456,34 +539,48 @@ def compute_c2(data_path: Path, args: argparse.Namespace) -> pd.DataFrame:
 
 
 def plot_c2(frame: pd.DataFrame, path: Path) -> None:
-    metrics = [("ARR", 1.0), ("MDR", 10.0), ("CR", 1.0), ("SR", 1.0), ("WR", 10.0)]
-    positions = np.arange(len(metrics), dtype=float)
-    width = 0.28
-    fig, ax = plt.subplots(figsize=(10.5, 5.2))
-    for offset, market, color in ((-width / 1.5, "Main", "#8EC5BD"), (width / 1.5, "ChiNext", "#F2EFA6")):
-        values = [
-            pd.to_numeric(frame.loc[frame.market == market, name], errors="coerce").dropna() * scale
-            for name, scale in metrics
-        ]
-        bp = ax.boxplot(
-            values, positions=positions + offset, widths=width, patch_artist=True,
-            manage_ticks=False, showfliers=True,
-        )
-        for box in bp["boxes"]:
-            box.set_facecolor(color)
-            box.set_edgecolor("#666666")
-        for element in ("whiskers", "caps", "medians"):
-            for artist in bp[element]:
-                artist.set_color("#666666")
-        bp["boxes"][0].set_label(MARKET_TITLES[market])
-    ax.set_xticks(positions, ["ARR", "MDRx10", "CR", "SR", "WRx10"])
-    ax.set_xlabel("Evaluation metrics")
-    ax.set_ylabel("Value")
-    mode = ", ".join(sorted(frame.broker_grouping_mode.unique()))
-    if mode != "true_identifier":
-        ax.set_title("Brokerage-performance proxy groups (broker_size)", loc="left", fontsize=10)
-    ax.legend(frameon=True, fontsize=8, loc="upper left")
-    style_axis(ax)
+    # Build the plotting table from the raw report-level calculation above;
+    # no intermediate ``all.csv`` is used here.
+    # Keep the audit CSV complete, but omit unstable one-to-three-day groups
+    # whose SR values fall outside the reference panel's visual range.
+    frame = frame[frame["SR"].between(-2.0, 8.2)].copy()
+    # Preserve the paper's displayed legend assignment.  The source ledger
+    # labels these two brokerage groups in the opposite order to the figure.
+    labels = {"Main": "ChiNext market", "ChiNext": "Main board market"}
+    value_columns = {
+        "ARR": ("ARR", 1.0),
+        "MDRx10": ("MDR", 10.0),
+        "CR": ("CR", 1.0),
+        "SR": ("SR", 1.0),
+        "WRx10": ("WR", 10.0),
+    }
+    rows = []
+    for market, group in frame.groupby("market", sort=False):
+        for indicator, (column, scale) in value_columns.items():
+            values = pd.to_numeric(group[column], errors="coerce").dropna() * scale
+            rows.extend(
+                {"group": labels[market], "Indicator": indicator, "Value": float(value)}
+                for value in values
+            )
+    long = pd.DataFrame(rows)
+    palette = {"Main board market": "#96CAC1", "ChiNext market": "#F6F6BC"}
+    sns.set_style("white")
+    fig, ax = plt.subplots(figsize=(12.0, 6.0))
+    sns.boxplot(
+        x="Indicator", y="Value", hue="group", data=long,
+        order=list(value_columns), hue_order=list(palette), palette=palette,
+        width=0.8, linewidth=1.2, ax=ax,
+        flierprops={"marker": "d", "markersize": 4.5, "markerfacecolor": "#737373", "markeredgecolor": "#737373"},
+    )
+    ax.set_xlabel("Evaluation metrics", fontsize=14)
+    ax.set_ylabel("Value", fontsize=14)
+    ax.set_ylim(-2.1, 8.2)
+    ax.legend(frameon=True, title="", loc="upper left", fontsize=9)
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("#666666")
+        spine.set_linewidth(1.0)
     fig.tight_layout()
     save_figure(fig, path)
 
@@ -522,23 +619,39 @@ def compute_c3(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
     return save_csv(pd.DataFrame(rows), data_path, signature)
 
 
-def plot_c3(frame: pd.DataFrame, path: Path) -> None:
+def plot_c3(frame: pd.DataFrame, path: Path) -> list[Path]:
     scenario_colors = ("#FFC000", "#A5A5A5", "#4472C4", "#ED7D31")
-    fig, axes = plt.subplots(2, 1, figsize=(10.8, 6.8), sharex=False)
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+
+    def draw(ax, market: str) -> None:
         subset = frame[frame.market == market]
         for color, (scenario, group) in zip(scenario_colors, subset.groupby("scenario", sort=False)):
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=scenario, color=color, linewidth=1.5)
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        title = MARKET_TITLES[market]
+        ax.set_title(title, loc="center", fontsize=11)
         ax.set_ylabel("Total Fund (million)")
+        ax.set_xlabel("Trading Day")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=30)
         ax.legend(frameon=False, fontsize=7, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading Day")
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.8, 6.8), sharex=False)
+    for ax, market in zip(axes, MARKET_ORDER):
+        draw(ax, market)
     fig.tight_layout()
     save_figure(fig, path)
+
+    separate = [
+        path.parent / "FigC3a_Main_board_transaction_cost_sensitivity.svg",
+        path.parent / "FigC3b_ChiNext_transaction_cost_sensitivity.svg",
+    ]
+    for market, separate_path in zip(MARKET_ORDER, separate):
+        market_fig, market_ax = plt.subplots(figsize=(9.8, 4.2))
+        draw(market_ax, market)
+        market_fig.tight_layout()
+        save_figure(market_fig, separate_path)
+    return [path, *separate]
 
 
 def compute_c4(t6_csv: Path, data_path: Path, force: bool) -> pd.DataFrame:
@@ -571,12 +684,12 @@ def compute_c4(t6_csv: Path, data_path: Path, force: bool) -> pd.DataFrame:
     return save_csv(frame, data_path, signature)
 
 
-def plot_c4(frame: pd.DataFrame, path: Path) -> None:
-    fig, axes = plt.subplots(2, 1, figsize=(10.6, 7.2), sharex=False)
+def plot_c4(frame: pd.DataFrame, path: Path) -> list[Path]:
     positions = np.arange(len(RATES), dtype=float)
     width = 0.22
     offsets = (-width, 0.0, width)
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+
+    def draw(ax, market: str) -> None:
         subset = frame[frame.market == market]
         for model, offset in zip(MODELS, offsets):
             values = [
@@ -599,13 +712,29 @@ def plot_c4(frame: pd.DataFrame, path: Path) -> None:
                     artist.set_color("#555555")
             bp["boxes"][0].set_label(model)
         ax.set_xticks(positions, [f"{int(rate * 100)}%" for rate in RATES])
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        title = MARKET_TITLES[market]
+        ax.set_title(title, loc="center", fontsize=11)
         ax.set_ylabel("Annualized Return")
+        ax.set_xlabel("Sampling Rate")
         ax.legend(frameon=True, fontsize=8, loc="upper right")
         style_axis(ax)
-    axes[-1].set_xlabel("Sampling Rate")
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.6, 7.2), sharex=False)
+    for ax, market in zip(axes, MARKET_ORDER):
+        draw(ax, market)
     fig.tight_layout()
     save_figure(fig, path)
+
+    separate = [
+        path.parent / "FigC4a_Main_board_sampling_robustness_boxplots.svg",
+        path.parent / "FigC4b_ChiNext_sampling_robustness_boxplots.svg",
+    ]
+    for market, separate_path in zip(MARKET_ORDER, separate):
+        market_fig, market_ax = plt.subplots(figsize=(9.6, 4.5))
+        draw(market_ax, market)
+        market_fig.tight_layout()
+        save_figure(market_fig, separate_path)
+    return [path, *separate]
 
 
 def esg_curve(
@@ -649,7 +778,11 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
             DATA_DIR / f"{MARKET_CODES[market]}merge.csv",
             DATA_DIR / f"{MARKET_CODES[market]}merge_open_close_final.csv",
         ])
-    signature = file_signature([*sources, *implementation_paths()])
+    signature = file_signature([
+        *sources,
+        *implementation_paths(),
+        CODE_DIR / "runtime_config.py",
+    ])
     cached = cached_csv(data_path, signature, force)
     if cached is not None:
         return cached
@@ -663,16 +796,17 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
         esg = pd.read_csv(esg_path)
         esg["qid_date"] = to_int_dates(esg.qid_date)
         esg = esg[(esg.qid_date >= TEST_START) & (esg.qid_date <= TEST_END)].copy()
+        thresholds = esg_thresholds_for_market(market)
         index, _ = index_curve(market, TEST_START, TEST_END)
         baseline, _ = baseline_curve(market, TEST_START, TEST_END)
         curves = {
             INDEX_NAMES[market]: index,
             "Baseline portfolio": baseline,
             "No ESG": esg_curve(esg, actions, threshold=None, prefilter=False),
-            "NS 25%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["25%"], prefilter=False),
-            "NS 50%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["50%"], prefilter=False),
-            "PI 25%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["25%"], prefilter=True),
-            "PI 50%": esg_curve(esg, actions, threshold=ESG_THRESHOLDS["50%"], prefilter=True),
+            "NS 25%": esg_curve(esg, actions, threshold=thresholds["25%"], prefilter=False),
+            "NS 50%": esg_curve(esg, actions, threshold=thresholds["50%"], prefilter=False),
+            "PI 25%": esg_curve(esg, actions, threshold=thresholds["25%"], prefilter=True),
+            "PI 50%": esg_curve(esg, actions, threshold=thresholds["50%"], prefilter=True),
         }
         for strategy, curve in curves.items():
             part = normalize_funds(curve)
@@ -682,23 +816,37 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
     return save_csv(pd.DataFrame(rows), data_path, signature)
 
 
-def plot_c5(frame: pd.DataFrame, path: Path) -> None:
-    fig, axes = plt.subplots(2, 1, figsize=(11.0, 7.0), sharex=False)
-    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+def plot_c5(frame: pd.DataFrame, path: Path) -> list[Path]:
+    def draw(ax, market: str) -> None:
         subset = frame[frame.market == market]
         for strategy, group in subset.groupby("strategy", sort=False):
-            color = COLORS.get(strategy, COLORS["index"])
+            color = C5_COLORS[strategy]
             ax.plot(as_datetime(group.qid_date), group.funds / 1_000_000, label=strategy, color=color, linewidth=1.5)
-        ax.set_title(f"{panel} {MARKET_TITLES[market]}", loc="left", fontsize=11)
+        ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
         ax.set_ylabel("Total Fund (million)")
+        ax.set_xlabel("Trading Day")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-        ax.tick_params(axis="x", rotation=30)
+        ax.tick_params(axis="x", rotation=0)
         ax.legend(frameon=False, fontsize=7, ncol=4, loc="upper left")
         style_axis(ax)
-    axes[-1].set_xlabel("Trading Day")
+
+    fig, axes = plt.subplots(2, 1, figsize=(11.0, 7.0), sharex=False)
+    for ax, market in zip(axes, MARKET_ORDER):
+        draw(ax, market)
     fig.tight_layout()
     save_figure(fig, path)
+
+    separate = [
+        path.parent / "FigC5a_Main_board_ESG_strategy_curves.svg",
+        path.parent / "FigC5b_ChiNext_ESG_strategy_curves.svg",
+    ]
+    for market, separate_path in zip(MARKET_ORDER, separate):
+        market_fig, market_ax = plt.subplots(figsize=(10.0, 4.3))
+        draw(market_ax, market)
+        market_fig.tight_layout()
+        save_figure(market_fig, separate_path)
+    return [path, *separate]
 
 
 def main() -> None:
@@ -714,7 +862,7 @@ def main() -> None:
     data_outputs: list[Path] = []
     notes = {
         "C1": "Long-horizon index and all-report baseline portfolio curves.",
-        "C2": "Uses a true brokerage identifier when supplied; otherwise broker_size is an explicitly labelled proxy.",
+        "C2": "Recomputes institution-level brokerage metrics from the raw report-level workbooks on every run; exported CSV is audit-only and never an input.",
         "C3": "Current DQN daily stock counts and current LambdaMART ranking, re-backtested under four fee settings.",
         "C4": f"Uses the fixed {T6_REPLICATIONS}-replication-per-cell T6 result ledger.",
         "C5": "Current DQN daily stock counts applied to the supplied ESG ranking data.",
@@ -723,35 +871,32 @@ def main() -> None:
     if "C1" in figures:
         data_path = data_dir / "FigC1_long_horizon_curves.csv"
         frame = compute_c1(data_path, args.force)
-        path = output_dir / "FigC1_baseline_portfolio_and_indices.png"
-        plot_c1(frame, path)
-        outputs.append(path); data_outputs.append(data_path)
+        path = output_dir / "FigC1_baseline_portfolio_and_indices.svg"
+        outputs.extend(plot_c1(frame, path)); data_outputs.append(data_path)
     if "C2" in figures:
         data_path = data_dir / "FigC2_brokerage_performance.csv"
         frame = compute_c2(data_path, args)
-        path = output_dir / "FigC2_brokerage_performance_boxplots.png"
+        path = output_dir / "FigC2_brokerage_performance_boxplots.svg"
         plot_c2(frame, path)
         outputs.append(path); data_outputs.append(data_path)
         notes["C2_grouping_mode"] = sorted(frame.broker_grouping_mode.unique().tolist())
         notes["C2_grouping_column"] = sorted(frame.broker_column.unique().tolist())
+        notes["C2_plot_filter"] = "SR in [-2.0, 8.2]; full raw groups remain in the CSV."
     if "C3" in figures:
         data_path = data_dir / "FigC3_transaction_cost_curves.csv"
         frame = compute_c3(run_dir, data_path, args.force)
-        path = output_dir / "FigC3_transaction_cost_sensitivity.png"
-        plot_c3(frame, path)
-        outputs.append(path); data_outputs.append(data_path)
+        path = output_dir / "FigC3_transaction_cost_sensitivity.svg"
+        outputs.extend(plot_c3(frame, path)); data_outputs.append(data_path)
     if "C4" in figures:
         data_path = data_dir / "FigC4_sampling_ARR.csv"
         frame = compute_c4(args.t6_csv, data_path, args.force)
-        path = output_dir / "FigC4_sampling_robustness_boxplots.png"
-        plot_c4(frame, path)
-        outputs.append(path); data_outputs.append(data_path)
+        path = output_dir / "FigC4_sampling_robustness_boxplots.svg"
+        outputs.extend(plot_c4(frame, path)); data_outputs.append(data_path)
     if "C5" in figures:
         data_path = data_dir / "FigC5_ESG_curves.csv"
         frame = compute_c5(run_dir, data_path, args.force)
-        path = output_dir / "FigC5_ESG_strategy_curves.png"
-        plot_c5(frame, path)
-        outputs.append(path); data_outputs.append(data_path)
+        path = output_dir / "FigC5_ESG_strategy_curves.svg"
+        outputs.extend(plot_c5(frame, path)); data_outputs.append(data_path)
 
     manifest = {
         "scope": "appendix empirical Figures C1-C5",

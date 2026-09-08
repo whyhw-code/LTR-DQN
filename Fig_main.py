@@ -3,7 +3,7 @@
 Figures 1 and 2 are methodological diagrams, and Figures C1-C5 belong to the
 appendix, so they are intentionally outside this entry point.  All plotted
 values are recomputed from the selected run and raw data.  Intermediate CSVs
-are retained next to the PNG files to make every curve auditable.
+are retained next to the SVG files to make every curve auditable.
 """
 
 from __future__ import annotations
@@ -568,10 +568,10 @@ def figure3(
         output_dir / "cache" / "fig3_dqn_models",
         seed_config, seed_override, n_games, force,
     )
-    paths = [output_dir / "Fig3a_LambdaRank_learning_rate.png", output_dir / "Fig3b_DQN_learning_rate.png"]
+    paths = [output_dir / "Fig3a_LambdaRank_learning_rate.svg", output_dir / "Fig3b_DQN_learning_rate.svg"]
     plot_two_market_lines(rank, "learning_rate", "Learning rate", paths[0], x_order=LEARNING_RATES)
     plot_two_market_lines(dqn, "learning_rate", "Learning rate", paths[1], x_order=DQN_LEARNING_RATES)
-    combined = output_dir / "Fig3_hyperparameter_comparison.png"
+    combined = output_dir / "Fig3_hyperparameter_comparison.svg"
     fig, axes = plt.subplots(1, 2, figsize=(11.5, 3.7))
     draw_market_lines(
         axes[0], rank, "learning_rate", "Learning rate",
@@ -598,9 +598,9 @@ def figure4(
         seed_config, seed_override, tree_method, force,
     )
     specs = (
-        ("learning_rate", "Learning rate", MART_LEARNING_RATES, "Fig4a_LambdaMART_learning_rate.png"),
-        ("n_estimators", "Number of weak learners", MART_ESTIMATORS, "Fig4b_LambdaMART_weak_learners.png"),
-        ("max_depth", "Maximum tree depth", MART_DEPTHS, "Fig4c_LambdaMART_max_depth.png"),
+        ("learning_rate", "Learning rate", MART_LEARNING_RATES, "Fig4a_LambdaMART_learning_rate.svg"),
+        ("n_estimators", "Number of weak learners", MART_ESTIMATORS, "Fig4b_LambdaMART_weak_learners.svg"),
+        ("max_depth", "Maximum tree depth", MART_DEPTHS, "Fig4c_LambdaMART_max_depth.svg"),
     )
     paths = []
     for parameter, xlabel, order, filename in specs:
@@ -610,7 +610,7 @@ def figure4(
             x_order=order,
         )
         paths.append(path)
-    combined = output_dir / "Fig4_LambdaMART_hyperparameters.png"
+    combined = output_dir / "Fig4_LambdaMART_hyperparameters.svg"
     fig, axes = plt.subplots(1, 3, figsize=(16.5, 3.8))
     for ax, (parameter, xlabel, order, _) , panel in zip(
         axes, specs, ("(a) Learning rate", "(b) Weak learners", "(c) Tree depth")
@@ -751,26 +751,40 @@ def date_values(values: pd.Series) -> pd.Series:
 
 
 def figure5(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
-    fig, axes = plt.subplots(2, 1, figsize=(11.5, 8.0), sharex=False)
-    for ax, market in zip(axes, MARKET_ORDER):
+    def draw_market(ax, market: str, *, panel: str | None = None) -> None:
         subset = curves[curves.market == market]
         for model, group in subset.groupby("model", sort=False):
             dates = date_values(group.qid_date)
             linewidth = 2.4 if model == "LTR-DQN" else 1.15
             color = FIG5_COLORS[model]
             ax.plot(dates, group.wealth, label=model, linewidth=linewidth, color=color)
-        ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
+        title = MARKET_TITLES[market]
+        ax.set_title(f"{panel} {title}" if panel else title, loc="center", fontsize=11)
         ax.set_ylabel("Total Fund (million)")
+        ax.set_xlabel("Trading day")
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.tick_params(axis="x", rotation=0)
         style_axis(ax)
         ax.legend(ncol=4, fontsize=7, frameon=False, loc="upper left")
-    axes[-1].set_xlabel("Trading day")
+
+    fig, axes = plt.subplots(2, 1, figsize=(11.5, 8.0), sharex=False)
+    for ax, market, panel in zip(axes, MARKET_ORDER, ("(a)", "(b)")):
+        draw_market(ax, market, panel=panel)
     fig.tight_layout()
-    path = output_dir / "Fig5_return_curves_all_methods.png"
-    save_figure(fig, path)
-    return [path]
+    combined = output_dir / "Fig5_return_curves_all_methods.svg"
+    save_figure(fig, combined)
+
+    separate = [
+        output_dir / "Fig5a_Main_board_return_curves_all_methods.svg",
+        output_dir / "Fig5b_ChiNext_return_curves_all_methods.svg",
+    ]
+    for market, path in zip(MARKET_ORDER, separate):
+        market_fig, market_ax = plt.subplots(figsize=(10.0, 4.2))
+        draw_market(market_ax, market)
+        market_fig.tight_layout()
+        save_figure(market_fig, path)
+    return [combined, *separate]
 
 
 def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
@@ -786,12 +800,12 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         ]
         for model, group in subset.groupby("model", sort=False):
             curve_ax.plot(
-                date_values(group.qid_date), group.wealth * 1_000_000,
+                date_values(group.qid_date), group.wealth,
                 label=model, linewidth=1.8 if model == "LTR-DQN" else 1.45,
                 color=FIG6_COLORS[model],
             )
         curve_ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11, pad=6)
-        curve_ax.set_ylabel("Total return")
+        curve_ax.set_ylabel("Total Fund (million)")
         curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
         style_axis(curve_ax)
@@ -807,7 +821,8 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         action_ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         action_ax.tick_params(axis="x", rotation=0)
         style_axis(action_ax)
-        fig.tight_layout(h_pad=0.6)
+        fig.tight_layout(h_pad=0.08)
+        fig.subplots_adjust(hspace=0.04)
         save_figure(fig, path)
 
     fig, axes = plt.subplots(
@@ -823,12 +838,12 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         ]
         for model, group in subset.groupby("model", sort=False):
             curve_ax.plot(
-                date_values(group.qid_date), group.wealth * 1_000_000, label=model,
+                date_values(group.qid_date), group.wealth, label=model,
                 linewidth=2.1 if model == "LTR-DQN" else 1.4,
                 color=FIG6_COLORS[model],
             )
         curve_ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)
-        curve_ax.set_ylabel("Total return")
+        curve_ax.set_ylabel("Total Fund (million)")
         curve_ax.tick_params(axis="x", labelbottom=False)
         curve_ax.legend(frameon=False, fontsize=8, ncol=3, loc="upper left")
         style_axis(curve_ax)
@@ -843,12 +858,13 @@ def figure6(curves: pd.DataFrame, output_dir: Path) -> list[Path]:
         action_ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         action_ax.tick_params(axis="x", rotation=0)
         style_axis(action_ax)
-    fig.tight_layout()
-    path = output_dir / "Fig6_DQN_actions_and_return_curves.png"
+    fig.tight_layout(h_pad=0.08)
+    fig.subplots_adjust(hspace=0.04)
+    path = output_dir / "Fig6_DQN_actions_and_return_curves.svg"
     save_figure(fig, path)
     separate = [
-        output_dir / "Fig6a_Main_board_actions_and_return.png",
-        output_dir / "Fig6b_ChiNext_actions_and_return.png",
+        output_dir / "Fig6a_Main_board_actions_and_return.svg",
+        output_dir / "Fig6b_ChiNext_actions_and_return.svg",
     ]
     for market, separate_path in zip(MARKET_ORDER, separate):
         plot_market(market, separate_path)
@@ -960,8 +976,8 @@ def figure7(
         )
         fig.subplots_adjust(left=0.23, right=0.98, top=0.92, bottom=0.22)
         path = output_dir / (
-            "Fig7a_Main_board_feature_importance.png"
-            if market == "Main" else "Fig7b_ChiNext_feature_importance.png"
+            "Fig7a_Main_board_feature_importance.svg"
+            if market == "Main" else "Fig7b_ChiNext_feature_importance.svg"
         )
         save_figure(fig, path)
         separate.append(path)
@@ -991,7 +1007,7 @@ def figure7(
         loc="lower center", bbox_to_anchor=(0.5, 0.015),
     )
     combined_fig.subplots_adjust(left=0.12, right=0.98, top=0.94, bottom=0.13, wspace=0.20)
-    combined = output_dir / "Fig7_feature_importance.png"
+    combined = output_dir / "Fig7_feature_importance.svg"
     save_figure(combined_fig, combined)
     return [combined, *separate]
 

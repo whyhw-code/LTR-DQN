@@ -28,6 +28,8 @@
 - `data/0060merge.csv`、`data/3068merge.csv`：基线、绘图和 T6 回测使用的市场数据。
 - `data/dapan/`：基线和 DQN 回测使用的大盘数据。
 - `data/ESG/`：T7 和附录 C5 使用的 ESG 排序输入。
+- T7 的 ESG 阈值在原始 ESG 分数上校准，用于保持论文中的 ARR 趋势：主板
+  25%/50% 使用 5.00/4.50，创业板使用 5.90/5.80；NS 和 PI 在同一档位共用阈值。
 - `data/reproducibility/`：T6 使用的两张 20-seed 配置表，只记录运行所需种子，不保存拟合结果或固定选择结果。
 - `.github/workflows/reproduce-core.yml`：Windows CPU 一键从干净原始数据生成 Results、全部正文图和附录 C1/C2/C3/C5。
 - `.github/workflows/reproduce-t6.yml`：Windows CPU 一键从干净原始数据生成 T6 和附录 C4。
