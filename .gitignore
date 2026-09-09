@@ -6,4 +6,5 @@ model/
 temp/
 runs/
 results/
+*.zip
 *.log

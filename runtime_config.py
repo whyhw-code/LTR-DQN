@@ -22,14 +22,12 @@ os.environ["MKL_CBWR"] = "COMPATIBLE"
 
 DEFAULT_DEVICE = "cpu"
 
-# ESG screening levels used by Table 7 and Appendix Figure C5.  These are
-# thresholds on the raw ESG score, selected once against the paper's ARR
-# direction and then applied identically to NS and PI within each market.
-# The scores themselves still come from the supplied raw ESG files; no output
-# or intermediate result is injected.
-ESG_THRESHOLDS = {
-    "Main": {"25%": 5.00, "50%": 4.50},
-    "ChiNext": {"25%": 5.90, "50%": 5.80},
+# T7 score cutoffs are computed from the raw cross-sectional ESG.csv file. The
+# resulting 25%/50% thresholds (5.52/6.02 for this data) are shared by both
+# markets and by NS/PI; the strategies differ only in replenishment behavior.
+ESG_QUANTILES = {
+    "25%": 0.25,
+    "50%": 0.50,
 }
 
 

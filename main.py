@@ -15,7 +15,6 @@ from experiment_core import (
     DATA_DIR,
     DQN_RANKER,
     MARKETS,
-    METRIC_NAMES,
     all_stock_metrics,
     artifact_dir,
     backtest_predictions,
@@ -446,6 +445,10 @@ def main() -> None:
         excel_path,
         write_table_csvs=args.export_csvs,
     )
+    t7_thresholds = {
+        market: esg_thresholds_for_market(market)
+        for market in markets
+    } if "T7" in tables else None
     manifest = {
         "run_dir": str(run_dir),
         "tables": sorted(tables),
@@ -454,6 +457,8 @@ def main() -> None:
         "seed_config": str(args.seed_config.resolve()) if args.seed_config else "built-in",
         "runtime": runtime_versions(),
         "rows": len(records),
+        "t7_esg_thresholds": t7_thresholds,
+        "t7_threshold_scope": "raw ESG.csv q25/q50 shared across Main and ChiNext, and by NS and PI within each level",
         "dqn_ranking_mode": "fresh_run",
         "dqn_evaluation_mode": args.dqn_eval_mode,
         "action_files": {

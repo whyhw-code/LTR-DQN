@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import platform
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,7 +22,7 @@ from sklearn.svm import SVC, SVR
 
 from runtime_config import (
     configure_torch_threads,
-    ESG_THRESHOLDS,
+    ESG_QUANTILES,
     LOCKED_RUNTIME,
     market_seed,
     set_global_determinism,
@@ -65,24 +64,44 @@ MARKETS = {"Main": "0060", "ChiNext": "3068"}
 DQN_RANKER = "LambdaMART"
 
 
-def esg_thresholds_for_market(market: str) -> dict[str, float]:
-    """Return calibrated ESG thresholds after validating raw ESG coverage."""
-    code = MARKETS.get(market, market)
-    path = DATA_DIR / "ESG" / f"{code}temp_test_ndcg_train3_esg.csv"
+def esg_thresholds_common() -> dict[str, float]:
+    """Return the paper's q25/q50 cutoffs from the raw ESG cross-section.
+
+    The original T7 scripts calculate the cutoffs from ``ESG.csv`` (one raw
+    ESG observation per stock), then apply them to the dated ranking panels.
+    Computing quantiles over the repeated dated panels changes the sample
+    weighting and no longer reproduces the paper's 5.52/6.02 thresholds.
+    """
+    if set(ESG_QUANTILES) != {"25%", "50%"}:
+        raise ValueError(f"ESG_QUANTILES must define 25% and 50%: {ESG_QUANTILES}")
+    if any(not 0.0 <= float(q) <= 1.0 for q in ESG_QUANTILES.values()):
+        raise ValueError(f"ESG quantiles must be in [0, 1]: {ESG_QUANTILES}")
+    path = DATA_DIR / "ESG" / "ESG.csv"
     if not path.is_file():
-        raise FileNotFoundError(f"T7 ESG data not found: {path}")
-    values = pd.to_numeric(pd.read_csv(path, usecols=["ESG"])["ESG"], errors="coerce").dropna()
-    if values.empty:
-        raise ValueError(f"T7 ESG data has no numeric ESG values: {path}")
-    thresholds = ESG_THRESHOLDS.get(market)
-    if thresholds is None:
-        raise ValueError(f"No ESG thresholds configured for market: {market}")
-    result = {label: float(value) for label, value in thresholds.items()}
-    if set(result) != {"25%", "50%"} or result["25%"] <= result["50%"]:
-        raise ValueError(f"Invalid ESG threshold ordering for {market}: {result}")
-    if any(value < float(values.min()) or value > float(values.max()) for value in result.values()):
-        raise ValueError(f"ESG thresholds outside raw score range for {market}: {result}")
+        raise FileNotFoundError(f"T7 raw ESG cross-section not found: {path}")
+    try:
+        column = pd.to_numeric(
+            pd.read_csv(path, usecols=["ESG"])["ESG"], errors="coerce"
+        ).dropna()
+    except ValueError as exc:
+        raise ValueError(f"T7 raw ESG data is missing the ESG column: {path}") from exc
+    if column.empty:
+        raise ValueError(f"T7 raw ESG data has no numeric ESG values: {path}")
+    result = {label: float(column.quantile(q)) for label, q in ESG_QUANTILES.items()}
+    if result["25%"] > result["50%"]:
+        raise ValueError(f"Invalid common ESG threshold ordering: {result}")
     return result
+
+
+def esg_thresholds_for_market(market: str) -> dict[str, float]:
+    """Return the shared q25/q50 cutoffs for either market.
+
+    The market argument is retained for call-site compatibility; both markets
+    intentionally use thresholds computed from the raw cross-sectional ESG.csv.
+    """
+    if market not in MARKETS:
+        raise ValueError(f"Unknown market for T7 ESG thresholds: {market}")
+    return esg_thresholds_common()
 
 
 def artifact_dir(run_dir: Path, kind: str) -> Path:
@@ -187,28 +206,6 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def canonicalize_ranking(frame: pd.DataFrame) -> pd.DataFrame:
-    """Store the only score information consumed downstream: daily Top-4 order."""
-    result = frame.copy()
-    if "prediction" in result:
-        raw_prediction = pd.to_numeric(result["prediction"])
-        result["prediction"] = 0
-        for _, group in result.assign(_raw_prediction=raw_prediction).groupby(
-            "qid_date", sort=True
-        ):
-            # `DataFrame.nlargest` in the GitHub scripts keeps the original
-            # row order when scores tie.  A stable score-only sort preserves
-            # that behavior while making the saved Top-4 representation
-            # deterministic.
-            ordered = group.sort_values(
-                ["_raw_prediction"], ascending=[False], kind="mergesort"
-            ).head(4)
-            result.loc[ordered.index, "prediction"] = range(4, 4 - len(ordered), -1)
-    return result.sort_values(
-        ["qid_date", "stock_code"], kind="mergesort"
-    ).reset_index(drop=True)
 
 
 def runtime_versions() -> dict[str, str]:
@@ -709,6 +706,8 @@ def esg_metrics(
     missing = sorted(required - set(frame.columns))
     if missing:
         raise ValueError(f"T7 ESG data is missing required columns {missing}: {esg_file}")
+    frame["ESG"] = pd.to_numeric(frame["ESG"], errors="coerce")
+    frame = frame.dropna(subset=["ESG"])
     actions = actions[["qid_date", "real_action"]].copy()
     actions["real_action"] = pd.to_numeric(actions["real_action"], errors="coerce").fillna(0)
     capital = 1_000_000.0
@@ -720,6 +719,8 @@ def esg_metrics(
             continue
         top_n = int(top_n_row.iloc[0])
         if prefilter:
+            # PI screens low-ESG stocks using the same cutoff, then
+            # replenishes the DQN count from the remaining recommendations.
             subset = group[group.ESG >= threshold]
             chosen = subset.nlargest(min(top_n, len(subset)), "prediction")
         else:

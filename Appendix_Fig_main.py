@@ -31,7 +31,6 @@ from experiment_core import (
     DATA_DIR,
     DQN_RANKER,
     FEES,
-    MARKETS,
     STAMP_TAX,
     TEST_END,
     TEST_START,
@@ -795,6 +794,8 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
         )
         esg = pd.read_csv(esg_path)
         esg["qid_date"] = to_int_dates(esg.qid_date)
+        esg["ESG"] = pd.to_numeric(esg["ESG"], errors="coerce")
+        esg = esg.dropna(subset=["ESG"])
         esg = esg[(esg.qid_date >= TEST_START) & (esg.qid_date <= TEST_END)].copy()
         thresholds = esg_thresholds_for_market(market)
         index, _ = index_curve(market, TEST_START, TEST_END)
@@ -904,6 +905,14 @@ def main() -> None:
         "output_dir": str(output_dir),
         "figures": figures,
         "runtime": runtime_versions(),
+        "t7_esg_thresholds": (
+            {
+                market: esg_thresholds_for_market(market)
+                for market in MARKET_ORDER
+            }
+            if "C5" in figures else None
+        ),
+        "t7_threshold_scope": "raw ESG.csv q25/q50 shared across Main and ChiNext, and by NS and PI within each level",
         "notes": {key: value for key, value in notes.items() if key in figures or key.startswith("C2_")},
         "outputs": {path.name: sha256(path) for path in outputs},
         "data": {path.name: sha256(path) for path in data_outputs},

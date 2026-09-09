@@ -42,10 +42,28 @@ daily action file, or historical `meiri_xuanze` selection file is required.
 - `data/0060report_broker_merged.xlsx` and `data/3068report_broker_merged.xlsx`:
   institution-level brokerage data used by Appendix Figure C2.
 - `data/dapan/`: broad-market data used by the baseline and DQN backtest paths.
-- `data/ESG/`: supplied ESG ranking inputs used by T7 and Appendix C5.
-- T7 ESG screening thresholds are calibrated on the raw ESG score scale to
-  preserve the paper's ARR direction. Main uses 5.00/4.50 for 25%/50% and
-  ChiNext uses 5.90/5.80. NS and PI share the same threshold at each level.
+- `data/ESG/`: supplied raw ESG ranking inputs used by T7 and Appendix C5.
+- T7 thresholds are computed from the combined Main and ChiNext raw ESG files
+  at runtime. The current data produce a shared q25/q50 of `5.79`/`6.32` for
+  both markets and both strategies.
+
+### T7 ESG strategies
+
+The paper defines the screening levels as the lowest ESG proportions to remove
+from the DQN portfolio; the corresponding score cutoffs are calculated from
+the raw cross-sectional ESG observations in `data/ESG/ESG.csv`:
+
+- **NS (Negative Screening)**: select the DQN-recommended stocks by predicted
+  ranking, then remove holdings below the shared q25 or q50 cutoff. The
+  portfolio may therefore contain fewer stocks than the original DQN
+  recommendation.
+- **PI (Positive Investing)**: apply the shared q25 or q50 cutoff, then
+  select the highest-ranked eligible recommendations by model prediction to
+  replace excluded holdings until the DQN-recommended count is reached (or
+  until eligible candidates are exhausted).
+
+Both markets use the same score cutoff at each level; NS does not replenish
+excluded holdings, whereas PI does.
 - `data/reproducibility/`: the two 20-seed T6 configuration ledgers. They store
   only the seeds used by the run, not fitted outputs or selection manifests.
 - `.github/workflows/reproduce-core.yml`: clean source-data workflow for

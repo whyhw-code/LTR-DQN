@@ -37,7 +37,6 @@ from experiment_core import (
     artifact_dir,
     backtest_predictions,
     evaluate_dqn,
-    fit_baseline,
     load_stock_data,
     runtime_versions,
     sha256,
@@ -960,7 +959,14 @@ def figure7(
             top = market_data[market_data.model == model].nlargest(5, "importance")
             top = top.sort_values("importance", ascending=True)
             positions = np.arange(5) + y_offset
-            ax.barh(positions, top.importance, color=model_colors[model], label=model)
+            bars = ax.barh(positions, top.importance, color=model_colors[model], label=model)
+            for bar, value in zip(bars, top.importance):
+                ax.text(
+                    float(value) + 0.01,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{float(value):.2f}",
+                    va="center", ha="left", fontsize=7,
+                )
             ticks.extend(positions)
             labels.extend(top.feature)
             y_offset += 6
@@ -994,7 +1000,14 @@ def figure7(
             top = market_data[market_data.model == model].nlargest(5, "importance")
             top = top.sort_values("importance", ascending=True)
             positions = np.arange(5) + y_offset
-            ax.barh(positions, top.importance, color=model_colors[model], label=model)
+            bars = ax.barh(positions, top.importance, color=model_colors[model], label=model)
+            for bar, value in zip(bars, top.importance):
+                ax.text(
+                    float(value) + 0.01,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{float(value):.2f}",
+                    va="center", ha="left", fontsize=7,
+                )
             ticks.extend(positions); labels.extend(top.feature); y_offset += 6
         ax.set_yticks(ticks); ax.set_yticklabels(labels, fontsize=8)
         ax.set_title(MARKET_TITLES[market], loc="center", fontsize=11)

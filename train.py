@@ -13,7 +13,6 @@ from pathlib import Path
 from experiment_core import (
     CODE_DIR,
     artifact_dir,
-    canonicalize_ranking,
     dqn_ranking_path,
     DQN_RANKER,
     evaluate_dqn,

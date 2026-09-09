@@ -27,9 +27,23 @@
 - `data/0060merge_T4.csv`、`data/3068merge_T4.csv`：论文表格使用的指数/参考序列。
 - `data/0060merge.csv`、`data/3068merge.csv`：基线、绘图和 T6 回测使用的市场数据。
 - `data/dapan/`：基线和 DQN 回测使用的大盘数据。
-- `data/ESG/`：T7 和附录 C5 使用的 ESG 排序输入。
-- T7 的 ESG 阈值在原始 ESG 分数上校准，用于保持论文中的 ARR 趋势：主板
-  25%/50% 使用 5.00/4.50，创业板使用 5.90/5.80；NS 和 PI 在同一档位共用阈值。
+- `data/ESG/`：T7 和附录 C5 使用的原始 ESG 排序输入。
+- T7 阈值在运行时由原始横截面文件 `data/ESG/ESG.csv` 计算。当前数据得到
+  q25/q50 为 `5.52`/`6.02`；两个市场及 NS 与 PI 共用同一组 cutoff。
+
+### T7 的两种 ESG 策略
+
+论文规定的是剔除 ESG 得分最低的比例，分数 cutoff 由原始横截面 ESG 数据计算：
+
+- **NS（Negative Screening，负面筛选）**：先按 DQN 的预测排名选出推荐股票，
+  再剔除低于统一 q25 或 q50 cutoff 的持仓。因此组合股票数可以少于原始
+  DQN 推荐数量。
+- **PI（Positive Investing，积极投资）**：使用统一 q25 或 q50 cutoff，
+  再按模型预测排名从合格推荐中选股，替换被排除股票，尽量补足 DQN 推荐数量；
+  若合格股票不足，则使用全部合格股票。
+
+两种策略在两个市场、同一档位共用一个 ESG 分数 cutoff；区别是 NS 不递补，
+PI 对被剔除的股票进行递补。
 - `data/reproducibility/`：T6 使用的两张 20-seed 配置表，只记录运行所需种子，不保存拟合结果或固定选择结果。
 - `.github/workflows/reproduce-core.yml`：Windows CPU 一键从干净原始数据生成 Results、全部正文图和附录 C1/C2/C3/C5。
 - `.github/workflows/reproduce-t6.yml`：Windows CPU 一键从干净原始数据生成 T6 和附录 C4。
