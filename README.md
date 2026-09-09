@@ -44,7 +44,7 @@ daily action file, or historical `meiri_xuanze` selection file is required.
 - `data/dapan/`: broad-market data used by the baseline and DQN backtest paths.
 - `data/ESG/`: supplied raw ESG ranking inputs used by T7 and Appendix C5.
 - T7 thresholds are computed from the combined Main and ChiNext raw ESG files
-  at runtime. The current data produce a shared q25/q50 of `5.79`/`6.32` for
+  at runtime. The current data produce a shared q25/q50 of `5.52`/`6.02` for
   both markets and both strategies.
 
 ### T7 ESG strategies
