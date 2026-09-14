@@ -41,6 +41,7 @@ from experiment_core import (
     validate_runtime,
 )
 from T6_main import T6_REPLICATIONS
+from runtime_config import ACTIVE_PARAMETER_FILE
 
 
 MARKET_ORDER = ("Main", "ChiNext")
@@ -150,7 +151,12 @@ def file_signature(paths: Iterable[Path]) -> str:
 
 
 def implementation_paths() -> list[Path]:
-    return [CODE_DIR / "Appendix_Fig_main.py", CODE_DIR / "experiment_core.py"]
+    return [
+        CODE_DIR / "Appendix_Fig_main.py",
+        CODE_DIR / "experiment_core.py",
+        CODE_DIR / "runtime_config.py",
+        ACTIVE_PARAMETER_FILE,
+    ]
 
 
 def cached_csv(path: Path, source_signature: str, force: bool) -> pd.DataFrame | None:
@@ -780,7 +786,6 @@ def compute_c5(run_dir: Path, data_path: Path, force: bool) -> pd.DataFrame:
     signature = file_signature([
         *sources,
         *implementation_paths(),
-        CODE_DIR / "runtime_config.py",
     ])
     cached = cached_csv(data_path, signature, force)
     if cached is not None:

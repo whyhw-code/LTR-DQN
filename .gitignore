@@ -8,3 +8,5 @@ runs/
 results/
 *.zip
 *.log
+.ssh_known_hosts*
+server_primary_results/

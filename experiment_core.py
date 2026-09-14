@@ -21,6 +21,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC, SVR
 
 from runtime_config import (
+    active_parameter_metadata,
     configure_torch_threads,
     ESG_QUANTILES,
     LOCKED_RUNTIME,
@@ -62,6 +63,17 @@ MARKETS = {"Main": "0060", "ChiNext": "3068"}
 # The paper's LTR-DQN pipeline uses LambdaMART ranking scores as the DQN
 # state input. LambdaRank remains an independent ranking-only baseline.
 DQN_RANKER = "LambdaMART"
+# The source T4M12/T4C12 scripts use market-specific LambdaMART objectives:
+# Main Board uses MAP and ChiNext uses NDCG.  Keeping this mapping explicit is
+# necessary because the objective changes the ranking, not just its metric.
+LAMBDA_MART_OBJECTIVES = {"0060": "rank:map", "3068": "rank:ndcg"}
+
+
+def lambda_mart_objective(bankuaicode: str) -> str:
+    try:
+        return LAMBDA_MART_OBJECTIVES[bankuaicode]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported market code for LambdaMART: {bankuaicode}") from exc
 
 
 def esg_thresholds_common() -> dict[str, float]:
@@ -211,9 +223,11 @@ def sha256(path: Path) -> str:
 def runtime_versions() -> dict[str, str]:
     configure_torch_threads(torch)
     device = torch_device()
+    parameter_metadata = active_parameter_metadata()
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
+        "runtime_mode": "linux-compat" if platform.system() == "Linux" else "locked",
         "machine": platform.machine(),
         "processor": platform.processor(),
         "numpy": np.__version__,
@@ -230,11 +244,22 @@ def runtime_versions() -> dict[str, str]:
         "openblas_num_threads": os.environ.get("OPENBLAS_NUM_THREADS", ""),
         "aten_cpu_capability": os.environ.get("ATEN_CPU_CAPABILITY", ""),
         "mkl_cbwr": os.environ.get("MKL_CBWR", ""),
+        "parameter_profile": parameter_metadata["profile"],
+        "parameter_file": parameter_metadata["file"],
+        "parameter_sha256": parameter_metadata["sha256"],
     }
 
 
 def validate_runtime() -> None:
     configure_torch_threads(torch)
+    parameter_metadata = active_parameter_metadata()
+    print(
+        "Platform parameters: "
+        f"system={parameter_metadata['system']}, "
+        f"profile={parameter_metadata['profile']}, "
+        f"file={parameter_metadata['file']}, "
+        f"sha256={parameter_metadata['sha256']}"
+    )
     actual = {
         "python": platform.python_version(),
         "numpy": np.__version__,
@@ -252,6 +277,12 @@ def validate_runtime() -> None:
             f"{name}={found!r} (required {expected!r})"
             for name, (expected, found) in mismatches.items()
         )
+        if os.environ.get("LTR_DQN_RELAXED_RUNTIME") == "1":
+            print(
+                "WARNING: relaxed runtime mode is active; dependency differences "
+                f"may cause small numerical changes: {details}"
+            )
+            return
         raise RuntimeError(
             "Locked reproduction environment mismatch: " + details + ". "
             "Create the environment from requirements-lock.txt or environment.yml; "
@@ -319,8 +350,12 @@ def fit_ranker(
     tree_method: str | None = None,
     rank_max_depth: int | None = None,
     rank_n_estimators: int | None = None,
+    rank_subsample: float | None = None,
+    rank_colsample_bytree: float | None = None,
     mart_max_bin: int | None = None,
     mart_min_child_weight: float | None = None,
+    mart_subsample: float | None = None,
+    mart_colsample_bytree: float | None = None,
 ) -> tuple[Any, pd.DataFrame, pd.DataFrame]:
     code = MARKETS.get(market, market)
     seed = market_seed(code) if seed is None else seed
@@ -354,17 +389,25 @@ def fit_ranker(
             # These two values are not reported for LambdaRank in Table C1.
             "max_depth": 6 if rank_max_depth is None else rank_max_depth,
             "n_estimators": 100 if rank_n_estimators is None else rank_n_estimators,
+            "subsample": 1.0 if rank_subsample is None else float(rank_subsample),
+            "colsample_bytree": (
+                1.0 if rank_colsample_bytree is None else float(rank_colsample_bytree)
+            ),
         })
     elif model_name == "LambdaMART":
         mart_params = PAPER_HYPERPARAMETERS["LambdaMART"][code]
         params.update({
-            "objective": "rank:map" if code == "0060" else "rank:ndcg",
+            "objective": lambda_mart_objective(code),
             **mart_params,
         })
         if mart_max_bin is not None:
             params["max_bin"] = int(mart_max_bin)
         if mart_min_child_weight is not None:
             params["min_child_weight"] = float(mart_min_child_weight)
+        if mart_subsample is not None:
+            params["subsample"] = float(mart_subsample)
+        if mart_colsample_bytree is not None:
+            params["colsample_bytree"] = float(mart_colsample_bytree)
     else:
         raise ValueError(f"Unsupported ranker: {model_name}")
     model = xgb.XGBRanker(**params)

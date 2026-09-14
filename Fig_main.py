@@ -30,6 +30,7 @@ from experiment_core import (
     DATA_DIR,
     DQN_RANKER,
     FEATURES,
+    lambda_mart_objective,
     MARKETS,
     PAPER_HYPERPARAMETERS,
     TEST_END,
@@ -43,7 +44,12 @@ from experiment_core import (
     train_dqn,
     validate_runtime,
 )
-from runtime_config import load_stage_seed_config, stage_seed
+from runtime_config import (
+    ACTIVE_PARAMETER_FILE,
+    ACTIVE_PLATFORM_PROFILE,
+    load_stage_seed_config,
+    stage_seed,
+)
 from main import baseline_ranking
 
 
@@ -135,7 +141,10 @@ def parse_args() -> argparse.Namespace:
         default="3,4,5,6,7",
         help="Comma-separated subset of 3,4,5,6,7",
     )
-    parser.add_argument("--seed_config", type=Path, default=None)
+    parser.add_argument(
+        "--seed_config", type=Path, default=None,
+        help="Optional JSON override; default is the automatically selected OS profile",
+    )
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--ranker_tree_method",
@@ -216,6 +225,7 @@ def implementation_paths() -> list[Path]:
         CODE_DIR / "Fig_main.py",
         CODE_DIR / "experiment_core.py",
         CODE_DIR / "runtime_config.py",
+        ACTIVE_PARAMETER_FILE,
     ]
 
 
@@ -259,9 +269,7 @@ def fit_ranker_variant(
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
     y_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[["real_return"]])
     params = {
-        "objective": "rank:pairwise" if model_name == "LambdaRank" else (
-            "rank:map" if code == "0060" else "rank:ndcg"
-        ),
+        "objective": "rank:pairwise" if model_name == "LambdaRank" else lambda_mart_objective(code),
         "tree_method": resolved_tree_method,
         "booster": "gbtree",
         "eval_metric": "ndcg",
@@ -1072,7 +1080,11 @@ def main() -> None:
         "output_dir": str(output_dir),
         "figures": figures,
         "seed": args.seed,
-        "seed_config": str(args.seed_config.resolve()) if args.seed_config else "built-in",
+        "platform_parameter_profile": ACTIVE_PLATFORM_PROFILE,
+        "seed_config": (
+            str(args.seed_config.resolve())
+            if args.seed_config else ACTIVE_PARAMETER_FILE.name
+        ),
         "ranker_tree_method": args.ranker_tree_method,
         "n_games": args.n_games,
         "runtime": runtime_versions(),

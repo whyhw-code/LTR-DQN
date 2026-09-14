@@ -28,8 +28,12 @@ daily action file, or historical `meiri_xuanze` selection file is required.
 - `experiment_core.py`: shared data loading, LambdaRank/LambdaMART fitting,
   baseline fitting, DQN environment and agent, backtesting, metrics, table
   formatting, manifests, and hashes.
-- `runtime_config.py`: Python/package lock values, independent stage seeds, and
-  deterministic single-CPU settings. The default DQN device is CPU.
+- `runtime_config.py`: detects Windows/Linux, validates the selected platform
+  parameter file, and applies deterministic single-CPU settings.
+- `parameters_windows.txt`: formal Windows reference seeds and unreported
+  implementation parameters used locally and by GitHub Actions.
+- `parameters_linux.txt`: emergency Linux CPU compatibility parameters. It is
+  not used by GitHub Actions.
 
 ### Data and automation
 
@@ -66,10 +70,8 @@ Both markets use the same score cutoff at each level; NS does not replenish
 excluded holdings, whereas PI does.
 - `data/reproducibility/`: the two 20-seed T6 configuration ledgers. They store
   only the seeds used by the run, not fitted outputs or selection manifests.
-- `.github/workflows/reproduce-core.yml`: clean source-data workflow for
-  Results, all main figures, and Appendix Figures C1/C2/C3/C5.
-- `.github/workflows/reproduce-t6.yml`: separate clean source-data workflow for
-  T6 and Appendix Figure C4.
+- `.github/workflows/reproduce-core.yml` and `reproduce-t6.yml`: Windows CPU
+  reference workflows.
 
 ### Environment and housekeeping
 
@@ -77,6 +79,9 @@ excluded holdings, whereas PI does.
   `torch==2.0.0+cpu`.
 - `environment.yml`: Conda environment definition for Python 3.9.13 and the
   CPU package set.
+- `environment-linux.yml`, `requirements-linux.txt`, `run_linux.sh`, and
+  `run_t6_linux.sh`: local/rented-server Linux emergency path. There is no
+  Linux GitHub Actions workflow.
 - `.gitignore`: excludes generated `results/`, `temp/`, `model/`, `runs/`, and
   Python caches from commits.
 - `README.md`: this guide.
@@ -94,9 +99,9 @@ results/    workbooks, paper CSVs, figure SVGs, and audit CSVs
 ## Requirements
 
 - Python 3.9.13, 64-bit x86 (`x64`).
-- This reproduction supports 64-bit Windows only: Windows 10/11 locally and
-  the standard Windows Server 2022 x64 runner in GitHub Actions. Do not switch
-  the workflows to a Linux runner.
+- Windows 10/11 CPU is the reference environment for the paper results. A
+  64-bit Linux x86 CPU compatibility path is also supported; Linux output is
+  intended to be close overall, not bit-for-bit identical.
 - CPU only. GPU is not required and is not selected by the default code path.
 - One compute thread is enforced for BLAS, XGBoost, and PyTorch to reduce
   cross-machine variation. More CPU cores may improve operating-system
@@ -104,9 +109,28 @@ results/    workbooks, paper CSVs, figure SVGs, and audit CSVs
 - At least 8 GB RAM and 10 GB free disk space are recommended for the full
   all-years run, because the training and figure steps create temporary files.
 
-Important pinned versions include pip 24.1.2, NumPy 1.21.5, pandas 1.4.4,
-scikit-learn 1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. The entry points check
-the locked runtime before fitting and stop on a mismatch.
+Reference versions include pip 24.1.2, NumPy 1.21.5, pandas 1.4.4,
+scikit-learn 1.2.0, PyTorch 2.0.0+cpu, and XGBoost 1.7.6. The Linux
+compatibility file installs these same exact versions. If a device cannot
+install them, set `LTR_DQN_RELAXED_RUNTIME=1` explicitly before running and
+accept that the output may differ.
+
+## Automatic platform parameter selection
+
+No platform parameter path is required on the command line. At startup,
+`runtime_config.py` checks `platform.system()` and loads exactly one tracked
+JSON-formatted text file:
+
+- Windows loads `parameters_windows.txt` and profile `windows-reference`.
+- Linux loads `parameters_linux.txt` and profile
+  `linux-emergency-compatibility`.
+- Any other operating system stops with an error instead of silently choosing
+  a profile.
+
+The files contain only seeds and implementation settings not fixed by the
+paper. Paper-reported learning rates and other reported hyperparameters remain
+defined and validated in code, so the platform profiles cannot override them.
+Every manifest records the profile name, file name, and SHA-256 hash.
 
 ## Installation
 
@@ -121,6 +145,26 @@ python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
 ```
+
+### Linux Bash
+
+```bash
+git clone https://github.com/whyhw-code/LTR-DQN.git
+cd LTR-DQN
+python3.9 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-linux.txt
+export MPLBACKEND=Agg PYTHONHASHSEED=0 PYTHONUTF8=1
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1 ATEN_CPU_CAPABILITY=default MKL_CBWR=COMPATIBLE
+```
+
+The Conda alternative is `conda env create -f environment-linux.yml`, followed
+by `conda activate ltr-dqn-linux`. Run `bash run_linux.sh` for the core tables
+and figures, or `bash run_t6_linux.sh` for T6 and Figure C4. The scripts require
+the locked versions by default; use `export LTR_DQN_RELAXED_RUNTIME=1` only
+when the locked wheels are unavailable.
 
 The Conda alternative is:
 
@@ -205,23 +249,27 @@ an external intermediate file.
 3. Select **2 - One-click T6 and Figure C4 (Windows CPU)** and choose **Run workflow** for T6 and
    Appendix C4.
 4. Open the completed run and download its artifact. The artifact contains the
-   generated workbook, CSVs, figures, and manifests.
+   generated workbook, CSVs, figures, manifests, and the selected
+   `parameters_windows.txt`.
 
-The repository has only the `main` branch. Both workflows have no user inputs
-and fix a standard Windows Server 2022 x64 CPU runner, Python 3.9.13, exact
-dependencies, a hash seed, and single-thread settings. The reproducer does not
-choose a branch, operating system, runner, or GPU.
+The repository has only the `main` branch. Both online workflows require the
+standard `windows-2022` x64 CPU runner and assert that
+`parameters_windows.txt` was selected before training. Linux compatibility is
+available only through the local shell scripts, not through GitHub Actions.
 
 ## Reproducibility notes
 
-- The default seed map is in `runtime_config.py`; the T6 seed ledgers are under
-  `data/reproducibility/`.
+- Platform-specific seeds and unreported implementation settings are in
+  `parameters_windows.txt` and `parameters_linux.txt`; the T6 seed ledgers are
+  under `data/reproducibility/`.
 - `LambdaRank` and `LambdaMART` are retrained from the raw tracked data on each
   run. DQN consumes the LambdaMART output created by that same run.
 - `PYTHONHASHSEED=0`, fixed seeds, deterministic PyTorch settings, stable CSV
   ordering, and `n_jobs=1` are enabled to reduce platform variation.
 - Manifests record runtime versions, input hashes, action hashes, and checkpoint
-  hashes. This reproduction requires Windows; cross-operating-system outputs
-  are not treated as normative reproduction results.
+  hashes. Linux manifests identify `runtime_mode=linux-compat`. Even with
+  identical dependencies, compiler, CPU-instruction-set, and math-library
+  differences between Linux and Windows can cause small numerical changes, so
+  bit-for-bit identity is not promised.
 - Do not change `--seed`, `--seed_config`, `--lr`, `--n_games`, or
   `--ranker_tree_method` when reproducing the reported default run.

@@ -31,6 +31,8 @@ from experiment_core import (
     write_results,
 )
 from runtime_config import (
+    ACTIVE_PARAMETER_FILE,
+    ACTIVE_PLATFORM_PROFILE,
     load_stage_seed_config,
     set_global_determinism,
     stage_seed,
@@ -84,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--seed_config", type=Path, default=None,
-        help="Optional JSON map of independent market/year/stage seeds",
+        help="Optional JSON override; default is the automatically selected OS profile",
     )
     parser.add_argument("--output_dir", type=Path, default=None)
     parser.add_argument(
@@ -454,7 +456,11 @@ def main() -> None:
         "tables": sorted(tables),
         "markets": markets,
         "seed": args.seed,
-        "seed_config": str(args.seed_config.resolve()) if args.seed_config else "built-in",
+        "platform_parameter_profile": ACTIVE_PLATFORM_PROFILE,
+        "seed_config": (
+            str(args.seed_config.resolve())
+            if args.seed_config else ACTIVE_PARAMETER_FILE.name
+        ),
         "runtime": runtime_versions(),
         "rows": len(records),
         "t7_esg_thresholds": t7_thresholds,

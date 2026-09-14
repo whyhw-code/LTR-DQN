@@ -49,6 +49,11 @@ jobs:
           python -m pip install -r requirements-lock.txt
           python -m pip check
           python -c "from experiment_core import validate_runtime; validate_runtime()"
+      - name: Verify Windows reference profile and tests
+        shell: pwsh
+        run: |
+          python -c "import platform; from runtime_config import ACTIVE_PARAMETER_FILE,ACTIVE_PLATFORM_PROFILE; assert platform.system() == 'Windows'; assert ACTIVE_PLATFORM_PROFILE == 'windows-reference'; assert ACTIVE_PARAMETER_FILE.name == 'parameters_windows.txt'; print('Parameter profile:', ACTIVE_PLATFORM_PROFILE)"
+          python -m unittest discover -s tests -v
       - name: Train all models from tracked source data
         run: python train.py --models all --years 2,3,4 --ranker_tree_method approx
       - name: Export T3, T4, T5 and T7 tables
@@ -66,5 +71,6 @@ jobs:
             results/figures/
             results/appendix_figures/
             temp/train_manifest.json
+            parameters_windows.txt
           if-no-files-found: error
           retention-days: 14

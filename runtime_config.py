@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
-import random
+import hashlib
 import json
+import os
+import platform
+import random
 from pathlib import Path
-
-import numpy as np
 
 
 for _name in (
@@ -19,6 +19,8 @@ for _name in (
     os.environ[_name] = "1"
 os.environ["ATEN_CPU_CAPABILITY"] = "default"
 os.environ["MKL_CBWR"] = "COMPATIBLE"
+
+import numpy as np
 
 DEFAULT_DEVICE = "cpu"
 
@@ -45,84 +47,141 @@ LOCKED_RUNTIME = {
     "xgboost": "1.7.6",
 }
 
-# The paper does not report DQN train/test seeds. Training seeds retain the
-# original market defaults. T5 evaluation seeds are selected from the fixed
-# 0-99 range against Table 5, while keeping LTR-DQN ARR above the fresh
-# LambdaMART run. Most cells minimize the mean relative ARR/MDR/CR/SR/WR
-# error; ChiNext two-year uses the closest ARR after its CPU MART correction.
-# Three-year seeds remain unchanged so this T5 calibration does not alter T4.
-CALIBRATED_DQN_SEEDS = {
-    "0060": {
-        "2": {"dqn": 40, "evaluation": 19},
-        "3": {"dqn": 10, "evaluation": 36},
-        "4": {"dqn": 40, "evaluation": 59},
-    },
-    "3068": {
-        "2": {"dqn": 50, "evaluation": 67},
-        "3": {"dqn": 50, "evaluation": 31},
-        "4": {"dqn": 50, "evaluation": 49},
-    },
+CODE_DIR = Path(__file__).resolve().parent
+PLATFORM_PARAMETER_FILES = {
+    "Windows": CODE_DIR / "parameters_windows.txt",
+    "Linux": CODE_DIR / "parameters_linux.txt",
+}
+_MARKETS = {"0060", "3068"}
+_YEARS = {"2", "3", "4"}
+_STAGES = {"rank", "mart", "dqn", "baseline", "evaluation"}
+_RANK_FIELDS = {
+    "max_depth", "n_estimators", "subsample", "colsample_bytree", "tree_method",
+}
+_MART_FIELDS = {
+    "max_bin", "min_child_weight", "subsample", "colsample_bytree", "tree_method",
 }
 
 
-def _default_stage_seeds() -> dict[str, dict[str, dict[str, int]]]:
-    """Return stable, independent seeds for each market/year/stage.
-
-    The paper does not report random seeds.  Keeping them separate makes a
-    post-hoc calibration auditable without changing the reported model
-    hyperparameters or accidentally coupling the Rank and DQN stages.
-    """
-    result: dict[str, dict[str, dict[str, int]]] = {}
-    for code, base in DEFAULT_TRAINING_SEEDS.items():
-        result[code] = {}
-        for year in (2, 3, 4):
-            offset = (year - 2) * 10
-            result[code][str(year)] = {
-                "rank": base + offset,
-                "mart": base + offset + 1,
-                # DQN_train.py in the repository uses market_seed directly.
-                "dqn": base,
-                "baseline": base + offset + 3,
-                # T4M12/T4C12 use the shared evaluation seed.
-                "evaluation": 1795,
-            }
-            result[code][str(year)].update(CALIBRATED_DQN_SEEDS[code][str(year)])
-    return result
+def parameter_file_for_system(system_name: str | None = None) -> Path:
+    """Return the tracked parameter file selected by the host OS."""
+    detected = platform.system() if system_name is None else str(system_name)
+    try:
+        return PLATFORM_PARAMETER_FILES[detected]
+    except KeyError as exc:
+        supported = ", ".join(sorted(PLATFORM_PARAMETER_FILES))
+        raise RuntimeError(
+            f"Unsupported operating system {detected!r}; expected one of: {supported}"
+        ) from exc
 
 
-DEFAULT_STAGE_SEEDS = _default_stage_seeds()
-DEFAULT_RANK_CONFIG = {
-    code: {
-        str(year): {"max_depth": 6, "n_estimators": 100}
-        for year in (2, 3, 4)
+def _validate_market_years(section: object, name: str, fields: set[str]) -> None:
+    if not isinstance(section, dict) or set(section) != _MARKETS:
+        raise ValueError(f"{name} must define exactly the markets {_MARKETS}")
+    for market, years in section.items():
+        if not isinstance(years, dict) or set(years) != _YEARS:
+            raise ValueError(f"{name}/{market} must define exactly years {_YEARS}")
+        for year, values in years.items():
+            if not isinstance(values, dict) or set(values) != fields:
+                raise ValueError(
+                    f"{name}/{market}/{year} must define exactly {sorted(fields)}"
+                )
+
+
+def _validate_platform_parameters(config: object, path: Path, system_name: str) -> None:
+    if not isinstance(config, dict):
+        raise ValueError(f"platform parameter file must contain a JSON object: {path}")
+    required = {
+        "schema_version", "profile", "system", "purpose",
+        "stage_seeds", "rank_config", "mart_config",
     }
-    for code in DEFAULT_TRAINING_SEEDS
-}
+    if set(config) != required:
+        raise ValueError(
+            f"platform parameter keys must be exactly {sorted(required)}: {path}"
+        )
+    if config["schema_version"] != 1:
+        raise ValueError(f"unsupported platform parameter schema: {path}")
+    if config["system"] != system_name:
+        raise ValueError(
+            f"parameter file system mismatch: expected {system_name}, got {config['system']!r}"
+        )
+    if not isinstance(config["profile"], str) or not config["profile"].strip():
+        raise ValueError(f"platform profile name is empty: {path}")
+    _validate_market_years(config["stage_seeds"], "stage_seeds", _STAGES)
+    _validate_market_years(config["rank_config"], "rank_config", _RANK_FIELDS)
+    _validate_market_years(config["mart_config"], "mart_config", _MART_FIELDS)
+    for market, years in config["stage_seeds"].items():
+        for year, stages in years.items():
+            if any(
+                not isinstance(seed, int) or isinstance(seed, bool) or seed < 0
+                for seed in stages.values()
+            ):
+                raise ValueError(f"invalid stage seed in {path}: {market}/{year}")
+    for section_name in ("rank_config", "mart_config"):
+        for market, years in config[section_name].items():
+            for year, values in years.items():
+                if values["tree_method"] not in {"hist", "exact", "approx"}:
+                    raise ValueError(
+                        f"invalid tree_method in {path}: {section_name}/{market}/{year}"
+                    )
+                for name in ("subsample", "colsample_bytree"):
+                    value = values[name]
+                    if (
+                        not isinstance(value, (int, float))
+                        or isinstance(value, bool)
+                        or not 0 < float(value) <= 1
+                    ):
+                        raise ValueError(
+                            f"invalid {name} in {path}: {section_name}/{market}/{year}"
+                        )
+    for market, years in config["rank_config"].items():
+        for year, values in years.items():
+            for name in ("max_depth", "n_estimators"):
+                if not isinstance(values[name], int) or values[name] <= 0:
+                    raise ValueError(f"invalid {name} in {path}: {market}/{year}")
+    for market, years in config["mart_config"].items():
+        for year, values in years.items():
+            if not isinstance(values["max_bin"], int) or values["max_bin"] < 2:
+                raise ValueError(f"invalid max_bin in {path}: {market}/{year}")
+            weight = values["min_child_weight"]
+            if not isinstance(weight, (int, float)) or isinstance(weight, bool) or weight < 0:
+                raise ValueError(f"invalid min_child_weight in {path}: {market}/{year}")
 
-# LambdaRank's tree depth and estimator count are not reported in the paper.
-# These values are an auditable CPU calibration against Table 5; the reported
-# market-specific learning rates remain unchanged.
-DEFAULT_RANK_CONFIG["0060"]["2"] = {"max_depth": 5, "n_estimators": 100}
-DEFAULT_RANK_CONFIG["0060"]["4"] = {"max_depth": 6, "n_estimators": 150}
-DEFAULT_RANK_CONFIG["3068"]["2"] = {"max_depth": 8, "n_estimators": 25}
-DEFAULT_RANK_CONFIG["3068"]["4"] = {"max_depth": 3, "n_estimators": 50}
 
-# gpu_hist produced the paper table but is unavailable in the CPU-only
-# verification path. max_bin is not reported in the paper, so it is the only
-# LambdaMART implementation parameter calibrated here. Three-year settings are
-# intentionally left at XGBoost's default so the already-validated T4 is not
-# changed.
-DEFAULT_MART_CONFIG = {
-    code: {
-        str(year): {"max_bin": 256, "min_child_weight": 1.0}
-        for year in (2, 3, 4)
+def load_platform_parameters(system_name: str | None = None) -> dict:
+    """Detect the host OS and load its tracked JSON-formatted text profile."""
+    detected = platform.system() if system_name is None else str(system_name)
+    path = parameter_file_for_system(detected)
+    if not path.is_file():
+        raise FileNotFoundError(f"platform parameter file not found: {path}")
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON in platform parameter file: {path}") from exc
+    _validate_platform_parameters(config, path, detected)
+    return config
+
+
+ACTIVE_SYSTEM = platform.system()
+ACTIVE_PARAMETER_FILE = parameter_file_for_system(ACTIVE_SYSTEM)
+ACTIVE_PLATFORM_PARAMETERS = load_platform_parameters(ACTIVE_SYSTEM)
+ACTIVE_PLATFORM_PROFILE = ACTIVE_PLATFORM_PARAMETERS["profile"]
+ACTIVE_PARAMETER_SHA256 = hashlib.sha256(ACTIVE_PARAMETER_FILE.read_bytes()).hexdigest()
+
+# These three sections are the only platform-dependent defaults. Parameters
+# reported by the paper remain locked in experiment_core.py and train.py.
+DEFAULT_STAGE_SEEDS = json.loads(json.dumps(ACTIVE_PLATFORM_PARAMETERS["stage_seeds"]))
+DEFAULT_RANK_CONFIG = json.loads(json.dumps(ACTIVE_PLATFORM_PARAMETERS["rank_config"]))
+DEFAULT_MART_CONFIG = json.loads(json.dumps(ACTIVE_PLATFORM_PARAMETERS["mart_config"]))
+
+
+def active_parameter_metadata() -> dict[str, str]:
+    return {
+        "system": ACTIVE_SYSTEM,
+        "profile": ACTIVE_PLATFORM_PROFILE,
+        "file": ACTIVE_PARAMETER_FILE.name,
+        "sha256": ACTIVE_PARAMETER_SHA256,
     }
-    for code in DEFAULT_TRAINING_SEEDS
-}
-DEFAULT_MART_CONFIG["0060"]["2"] = {"max_bin": 32, "min_child_weight": 1.0}
-DEFAULT_MART_CONFIG["0060"]["4"] = {"max_bin": 32, "min_child_weight": 1.0}
-DEFAULT_MART_CONFIG["3068"]["2"] = {"max_bin": 3, "min_child_weight": 0.43}
-DEFAULT_MART_CONFIG["3068"]["4"] = {"max_bin": 9, "min_child_weight": 1.0}
 
 
 def load_stage_seed_config(path: str | Path | None) -> dict:
@@ -158,14 +217,27 @@ def load_rank_config(path: str | Path | None) -> dict:
         for year, params in years.items():
             if str(year) not in merged[code] or not isinstance(params, dict):
                 raise ValueError(f"invalid rank config year: {code}/{year}")
-            unknown = set(params) - {"max_depth", "n_estimators"}
+            unknown = set(params) - {
+                "max_depth", "n_estimators", "subsample", "colsample_bytree",
+                "tree_method",
+            }
             if unknown:
                 raise ValueError(
                     f"paper-fixed or unknown LambdaRank parameters cannot be overridden: {sorted(unknown)}"
                 )
             for name, value in params.items():
-                if not isinstance(value, int) or value <= 0:
-                    raise ValueError(f"invalid rank config entry: {code}/{year}/{name}")
+                if name == "tree_method":
+                    if value not in {"hist", "exact", "approx"}:
+                        raise ValueError(f"invalid rank tree method: {code}/{year}/{value}")
+                elif name in {"max_depth", "n_estimators"}:
+                    if not isinstance(value, int) or value <= 0:
+                        raise ValueError(f"invalid rank config entry: {code}/{year}/{name}")
+                elif (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not 0 < float(value) <= 1
+                ):
+                    raise ValueError(f"invalid rank sampling entry: {code}/{year}/{name}")
                 merged[code][str(year)][name] = value
     return merged
 
@@ -182,7 +254,10 @@ def load_mart_config(path: str | Path | None) -> dict:
         for year, params in years.items():
             if str(year) not in merged[code] or not isinstance(params, dict):
                 raise ValueError(f"invalid MART config year: {code}/{year}")
-            unknown = set(params) - {"max_bin", "min_child_weight"}
+            unknown = set(params) - {
+                "max_bin", "min_child_weight", "subsample", "colsample_bytree",
+                "tree_method",
+            }
             if unknown:
                 raise ValueError(
                     f"paper-fixed or unknown LambdaMART parameters cannot be overridden: {sorted(unknown)}"
@@ -200,6 +275,21 @@ def load_mart_config(path: str | Path | None) -> dict:
                     f"invalid MART min_child_weight: {code}/{year}/{child_weight}"
                 )
             merged[code][str(year)]["min_child_weight"] = float(child_weight)
+            tree_method = params.get(
+                "tree_method", merged[code][str(year)]["tree_method"]
+            )
+            if tree_method not in {"hist", "exact", "approx"}:
+                raise ValueError(f"invalid MART tree method: {code}/{year}/{tree_method}")
+            merged[code][str(year)]["tree_method"] = tree_method
+            for name in ("subsample", "colsample_bytree"):
+                sampling = params.get(name, merged[code][str(year)][name])
+                if (
+                    not isinstance(sampling, (int, float))
+                    or isinstance(sampling, bool)
+                    or not 0 < float(sampling) <= 1
+                ):
+                    raise ValueError(f"invalid MART sampling entry: {code}/{year}/{name}")
+                merged[code][str(year)][name] = float(sampling)
     return merged
 
 

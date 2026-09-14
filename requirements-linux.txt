@@ -1,0 +1,4 @@
+# Linux compatibility environment. Keep the exact same wheels as the
+# Windows reference environment whenever Python 3.9.13 wheels are available.
+# This avoids silent NumPy/pandas/scikit-learn drift that changes fitted models.
+-r requirements-lock.txt

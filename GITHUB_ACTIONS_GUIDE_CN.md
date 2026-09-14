@@ -7,7 +7,7 @@
 - **1 - One-click Results and Figures (Windows CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5。
 - **2 - One-click T6 and Figure C4 (Windows CPU)**：单独生成 T6 和附录图 C4。
 
-两个任务都固定使用 GitHub 提供的标准 Windows Server 2022 x64 CPU。这个复现版本不支持 Linux runner。无需创建或选择 runner，也无需选择 GPU。
+两个任务都固定使用标准 Windows Server 2022 x64 CPU，作为论文结果参考环境。工作流会自动检查系统并确认读取 `parameters_windows.txt`，无需创建或选择 runner，也无需选择 GPU。Linux 应急兼容只允许在本地或租用服务器通过 shell 脚本运行。
 
 ## 一、准备新账号
 
@@ -30,7 +30,7 @@
    https://github.com/你的账号/LTR-DQN
    ```
 
-Fork 会复制原始数据、脚本、环境锁定文件和两个在线复现工作流，不会复制以前的运行结果。
+Fork 会复制原始数据、脚本、环境文件和两个 Windows 在线复现工作流，不会复制以前的运行结果。
 
 ## 三、启用 Actions
 
@@ -101,7 +101,7 @@ T6 的 100% 结果来自同一次运行中新评估的 T4 模型，不依赖外�
    ltr-dqn-t6-and-c4-运行编号
    ```
 
-4. 解压 ZIP 后，按上面的 `results/` 路径查找工作簿和图片。
+4. 解压 ZIP 后，按上面的 `results/` 路径查找工作簿和图片；包内的 `parameters_windows.txt` 是该次 Windows 复现采用的平台参数。
 
 Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的运行通常不会生成完整的最终结果包。
 
@@ -121,11 +121,11 @@ Artifacts 保留 14 天。超过期限后需要重新运行工作流。失败的
 
 ### GitHub 要求选择 runner
 
-本仓库的 runner 已在工作流中固定为 `windows-2022`，正常启动页面不会要求选择。不要进入组织的 **Settings > Actions > Runners** 创建机器；直接在仓库的 **Actions** 页面运行即可。
+本仓库的两个工作流都固定为 `windows-2022`，正常启动页面不会要求选择。不要进入组织的 **Settings > Actions > Runners** 创建机器；直接在仓库的 **Actions** 页面运行即可。
 
 ### 环境安装失败
 
-打开失败记录，展开 **Install locked environment**，保存完整错误信息。工作流锁定 Windows Server 2022 x64、Python 3.9.13、pip 24.1.2 和实验依赖版本，安装失败时不要随意升级包版本，否则可能改变结果。2026 年 9 月 5 日以前 Fork 的 Linux 版本如果显示 `xgboost 1.7.6 is not supported on this platform`，请先按下方“Fork 后原仓库更新了”同步 `main`，再重新运行 Windows 版本。
+打开失败记录，展开 **Install locked environment**，保存完整错误信息。Windows 工作流锁定 Python 3.9.13 和参考依赖，并使用 `parameters_windows.txt`。不要随意升级 XGBoost 或 PyTorch，否则可能改变结果。
 
 ### Fork 后原仓库更新了
 

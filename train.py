@@ -26,6 +26,8 @@ from experiment_core import (
     validate_runtime,
 )
 from runtime_config import (
+    ACTIVE_PARAMETER_FILE,
+    ACTIVE_PLATFORM_PROFILE,
     load_mart_config,
     load_rank_config,
     load_stage_seed_config,
@@ -67,15 +69,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--seed_config", type=Path, default=None,
-        help="Optional JSON map of independent market/year/stage seeds",
+        help="Optional JSON override; default is the automatically selected OS profile",
     )
     parser.add_argument(
         "--rank_config", type=Path, default=None,
-        help="Optional JSON map for unreported LambdaRank max_depth/n_estimators only",
+        help="Optional JSON override for unreported LambdaRank parameters",
     )
     parser.add_argument(
         "--mart_config", type=Path, default=None,
-        help="Optional JSON map for CPU LambdaMART max_bin only",
+        help="Optional JSON override for unreported CPU LambdaMART parameters",
     )
     parser.add_argument("--n_games", type=int, default=31)
     parser.add_argument("--lr", type=float, default=0.002)
@@ -205,14 +207,16 @@ def main() -> None:
     manifest["years"] = sorted(set(manifest.get("years", [])) | set(args.years))
     manifest["n_games"] = args.n_games
     manifest["runtime"] = runtime_versions()
+    default_parameter_source = ACTIVE_PARAMETER_FILE.name
     manifest["invocations"].append({
         "models": sorted(selected),
         "markets": args.markets,
         "years": args.years,
         "seed_override": args.seed,
-        "seed_config": str(args.seed_config.resolve()) if args.seed_config else "built-in",
-        "rank_config": str(args.rank_config.resolve()) if args.rank_config else "built-in",
-        "mart_config": str(args.mart_config.resolve()) if args.mart_config else "built-in",
+        "platform_parameter_profile": ACTIVE_PLATFORM_PROFILE,
+        "seed_config": str(args.seed_config.resolve()) if args.seed_config else default_parameter_source,
+        "rank_config": str(args.rank_config.resolve()) if args.rank_config else default_parameter_source,
+        "mart_config": str(args.mart_config.resolve()) if args.mart_config else default_parameter_source,
         "n_games": args.n_games,
         "lr": args.lr,
         "gamma": args.gamma,
@@ -238,13 +242,22 @@ def main() -> None:
                         "rank" if model_name == "LambdaRank" else "mart",
                         seed_config, args.seed,
                     )
+                    model_tree_method = (
+                        rank_params["tree_method"]
+                        if model_name == "LambdaRank"
+                        else mart_params["tree_method"]
+                    )
                     model, train_ranked, test_ranked = fit_ranker(
                         market, year, model_name, seed=model_seed,
-                        tree_method=ranker_tree_method,
+                        tree_method=model_tree_method,
                         rank_max_depth=rank_params["max_depth"],
                         rank_n_estimators=rank_params["n_estimators"],
+                        rank_subsample=rank_params["subsample"],
+                        rank_colsample_bytree=rank_params["colsample_bytree"],
                         mart_max_bin=mart_params["max_bin"],
                         mart_min_child_weight=mart_params["min_child_weight"],
+                        mart_subsample=mart_params["subsample"],
+                        mart_colsample_bytree=mart_params["colsample_bytree"],
                     )
                     train_path = rankings_dir / f"{market}_{model_name}_train{year}.csv"
                     test_path = rankings_dir / f"{market}_{model_name}_test{year}.csv"
@@ -257,7 +270,7 @@ def main() -> None:
                         "train_year": year,
                         "model": model_name,
                         "seed": model_seed,
-                        "tree_method": effective_tree_method,
+                        "tree_method": model_tree_method,
                         "paper_parameters": PAPER_HYPERPARAMETERS[model_name][MARKETS[market]],
                         "source_entrypoint_parameters": (
                             T4_MART_HYPERPARAMETERS[MARKETS[market]]
