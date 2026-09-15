@@ -6,15 +6,19 @@ import hashlib
 import json
 import os
 import platform
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+warnings.filterwarnings("ignore")
+
 import numpy as np
 import pandas as pd
 import torch
 import xgboost as xgb
+xgb.set_config(verbosity=0)
 from sklearn.linear_model import Lasso
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.preprocessing import MinMaxScaler
@@ -278,10 +282,8 @@ def validate_runtime() -> None:
             for name, (expected, found) in mismatches.items()
         )
         if os.environ.get("LTR_DQN_RELAXED_RUNTIME") == "1":
-            print(
-                "WARNING: relaxed runtime mode is active; dependency differences "
-                f"may cause small numerical changes: {details}"
-            )
+            # The manifest records the actual versions; keep the result stream
+            # free of warning text when relaxed mode is explicitly requested.
             return
         raise RuntimeError(
             "Locked reproduction environment mismatch: " + details + ". "

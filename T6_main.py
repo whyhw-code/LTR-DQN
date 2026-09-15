@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore")
 
 import pandas as pd
 
@@ -116,6 +119,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+xgb.set_config(verbosity=0)
 
 
 CODE_DIR = Path(__file__).resolve().parent

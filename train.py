@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore")
 
 from experiment_core import (
     CODE_DIR,

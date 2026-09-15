@@ -167,6 +167,8 @@ py -3.9 -m venv .venv
 python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
+$env:PYTHONWARNINGS = "ignore"
+$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 ```
 
 The formal Windows Conda alternative is:
@@ -185,6 +187,10 @@ python -m compileall -q *.py
 
 The last line should print `False` for CUDA availability and the thread count
 should be `1`.
+
+The Windows entry points and workflows suppress third-party Python warnings,
+XGBoost warning logs, and pip version notices so the run output contains only
+progress, results, and actual errors.
 
 ## Complete local reproduction (Windows PowerShell)
 

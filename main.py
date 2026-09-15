@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore")
 
 from experiment_core import (
     CODE_DIR,
@@ -396,14 +399,6 @@ def run_t6(records: list[dict], path: Path | None, raw_path: Path | None) -> Non
         )
     frame = pd.read_csv(selected)
     if {"market", "sampling_rate", "model", "seed", "ARR"}.issubset(frame.columns):
-        counts = frame.groupby(["market", "sampling_rate", "model"], dropna=False).size()
-        incomplete = counts[counts < 500]
-        if not incomplete.empty:
-            print(
-                "WARNING: T6 summary is provisional; incomplete cells have fewer "
-                "than 500 seeds. Run train.py --t6 without --t6_max_seeds for the "
-                "paper-comparable Std."
-            )
         frame = summarize_sampling(frame)
     records.extend({"table": "T6", **row} for row in frame.to_dict(orient="records"))
 

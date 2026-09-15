@@ -11,8 +11,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import warnings
 from pathlib import Path
 from typing import Iterable
+
+warnings.filterwarnings("ignore")
 
 import matplotlib
 
@@ -22,6 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+xgb.set_config(verbosity=0)
 from sklearn.linear_model import Lasso
 from sklearn.preprocessing import MinMaxScaler
 

@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 360
     env:
       MPLBACKEND: Agg
+      PYTHONWARNINGS: ignore
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
       PYTHONHASHSEED: "0"
       PYTHONUTF8: "1"
       OMP_NUM_THREADS: "1"

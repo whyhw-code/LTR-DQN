@@ -1,6 +1,9 @@
 name: ltr-dqn
 channels:
   - defaults
+variables:
+  PYTHONWARNINGS: ignore
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 dependencies:
   - python=3.9.13
   - pip

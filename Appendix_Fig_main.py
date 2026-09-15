@@ -14,8 +14,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import warnings
 from pathlib import Path
 from typing import Iterable
+
+warnings.filterwarnings("ignore")
 
 import matplotlib
 

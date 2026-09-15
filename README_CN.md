@@ -115,6 +115,8 @@ py -3.9 -m venv .venv
 python -m pip install --upgrade "pip==24.1.2"
 python -m pip install -r requirements-lock.txt
 $env:PYTHONHASHSEED = "0"
+$env:PYTHONWARNINGS = "ignore"
+$env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 ```
 
 Windows 也可以使用 Conda：
@@ -132,6 +134,8 @@ python -m compileall -q *.py
 ```
 
 最后一项应显示 `False`，线程数应为 `1`。
+
+Windows 入口脚本和工作流会统一屏蔽第三方 Python 警告、XGBoost 警告日志以及 pip 版本提示，运行输出只保留进度、结果和真正的错误。
 
 ## 本地完整复现命令（Windows PowerShell）
 

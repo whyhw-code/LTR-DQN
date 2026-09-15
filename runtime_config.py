@@ -5,7 +5,13 @@ import json
 import os
 import platform
 import random
+import warnings
 from pathlib import Path
+
+
+# Reproduction output should contain results and errors only.  Third-party
+# deprecation/convergence/runtime warnings are not part of the paper output.
+warnings.filterwarnings("ignore")
 
 
 for _name in (
