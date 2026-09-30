@@ -400,6 +400,7 @@ def main() -> None:
             t4_reference_path, index=False, float_format="%.17g"
         )
         t6_output = t6_run_dir / "t6_raw.csv"
+        t6_tree_method = "hist"
         raw = run_sampling(
             data_dir=CODE_DIR / "data", seed_path=seed_path,
             select_map_path=select_path, output_path=t6_output,
@@ -409,12 +410,12 @@ def main() -> None:
             use_gpu=False, resume=False,
             dqn_seed_path=dqn_seed_path, require_gpu=False,
             full_rate_path=t4_reference_path,
-            tree_method=args.ranker_tree_method,
+            tree_method=t6_tree_method,
         )
         t6_manifest = {
             "markets": t6_markets,
             "max_seeds_per_cell": args.t6_max_seeds,
-            "ranker_tree_method": args.ranker_tree_method,
+            "ranker_tree_method": t6_tree_method,
             "seed_summary": str(seed_path),
             "seed_summary_sha256": sha256(seed_path),
             "dqn_seed_summary": str(dqn_seed_path),
