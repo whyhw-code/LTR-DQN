@@ -409,10 +409,12 @@ def main() -> None:
             use_gpu=False, resume=False,
             dqn_seed_path=dqn_seed_path, require_gpu=False,
             full_rate_path=t4_reference_path,
+            tree_method=args.ranker_tree_method,
         )
         t6_manifest = {
             "markets": t6_markets,
             "max_seeds_per_cell": args.t6_max_seeds,
+            "ranker_tree_method": args.ranker_tree_method,
             "seed_summary": str(seed_path),
             "seed_summary_sha256": sha256(seed_path),
             "dqn_seed_summary": str(dqn_seed_path),

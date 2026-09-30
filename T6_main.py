@@ -301,7 +301,7 @@ def make_ranker(market: str, model_name: str, seed: int, tree_method: str) -> xg
 
 def train_predict_temp(
     all_df: pd.DataFrame, market: str, rate: float, seed: int, model_name: str,
-    use_gpu: bool = False, require_gpu: bool = False,
+    tree_method: str, use_gpu: bool = False, require_gpu: bool = False,
 ) -> pd.DataFrame:
     set_seed(seed)
     if rate < 1.0:
@@ -316,7 +316,7 @@ def train_predict_temp(
     raw_test = sampled[(sampled.qid_date >= TEST_START) & (sampled.qid_date <= TEST_END)]
     x_train = train[XCOL_NAME].drop(columns=["qid_date"])
     y_train = train[["real_return"]].to_numpy()
-    methods = ["gpu_hist"] if require_gpu else (["gpu_hist", "hist"] if use_gpu else ["hist"])
+    methods = ["gpu_hist"] if require_gpu else (["gpu_hist", tree_method] if use_gpu else [tree_method])
     last_error = None
     for method in methods:
         try:
@@ -373,7 +373,7 @@ def load_select_map(path: Path, market: str) -> dict[int, int]:
 
 def run_sampling(
     data_dir: Path, seed_path: Path, select_map_path: Path,
-    output_path: Path, markets: list[str] | None = None,
+    output_path: Path, tree_method: str, markets: list[str] | None = None,
     max_seeds: int | None = None, use_gpu: bool = False,
     resume: bool = True, include_full_rate: bool = True,
     dqn_seed_path: Path | None = None, require_gpu: bool = False,
@@ -449,7 +449,8 @@ def run_sampling(
                         continue
                     temp = train_predict_temp(
                         all_df, market, rate, seed, model_name,
-                        use_gpu=use_gpu, require_gpu=require_gpu,
+                        tree_method=tree_method, use_gpu=use_gpu,
+                        require_gpu=require_gpu,
                     )
                     arr = backtest_top4(temp)
                     rows.append({"market": market, "sampling_rate": rate, "sampling_label": label, "model": model_name, "seed": seed, "ARR": arr})
