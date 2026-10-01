@@ -137,7 +137,7 @@ INITIAL_CAPITAL = 1_000_000
 MARKET_CONFIG = {
     "Main": {
         "code": "0060", "prefix": "T6M", "action_column": "60",
-        "rank_learning_rate": 0.01, "mart_objective": "rank:ndcg",
+        "rank_learning_rate": 0.01, "mart_objective": "rank:map",
         "mart_learning_rate": 0.001, "mart_depth": 5,
     },
     "ChiNext": {
