@@ -1,4 +1,4 @@
-"""Reproduce the empirical appendix figures (Figures C1-C5).
+"""Reproduce appendix figures C1-C5 and tables B1-B4/C1.
 
 This is intentionally separate from ``Fig_main.py``.  Every plotted value is
 derived from the current data/artifacts, and the underlying CSVs plus SHA-256
@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import warnings
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -32,6 +33,8 @@ import seaborn as sns
 from experiment_core import (
     CODE_DIR,
     DATA_DIR,
+    FEATURES,
+    PAPER_HYPERPARAMETERS,
     DQN_RANKER,
     FEES,
     STAMP_TAX,
@@ -42,6 +45,8 @@ from experiment_core import (
     sha256,
     esg_thresholds_for_market,
     validate_runtime,
+    model_for_baseline,
+    _stabilize_xlsx,
 )
 from T6_main import T6_REPLICATIONS
 from runtime_config import ACTIVE_PARAMETER_FILE
@@ -89,7 +94,7 @@ C5_COLORS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Recompute and export appendix Figures C1-C5"
+        description="Recompute appendix Figures C1-C5 and Tables B1-B4/C1"
     )
     parser.add_argument(
         "--run_dir", type=Path, default=CODE_DIR,
@@ -100,7 +105,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--figures", default="C1,C2,C3,C4,C5",
-        help="Comma-separated subset of C1,C2,C3,C4,C5",
+        help="Comma-separated subset of C1,C2,C3,C4,C5; none for tables only",
+    )
+    parser.add_argument(
+        "--tables", default="",
+        help="Comma-separated subset of B1,B2,B3,B4,C1; all exports all five tables",
+    )
+    parser.add_argument(
+        "--tables_output_dir", type=Path, default=CODE_DIR / "results" / "appendix_tables",
     )
     parser.add_argument(
         "--t6_csv", type=Path, default=CODE_DIR / "temp" / "t6_runs" / "t6_raw.csv",
@@ -123,6 +135,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def selected_figures(value: str) -> list[str]:
+    if value.strip().lower() == "none":
+        return []
     result = []
     for item in value.split(","):
         label = item.strip().upper()
@@ -134,6 +148,175 @@ def selected_figures(value: str) -> list[str]:
     if not result or invalid:
         raise ValueError(f"figures must be a subset of C1,C2,C3,C4,C5; invalid={invalid}")
     return result
+
+
+def selected_tables(value: str) -> list[str]:
+    allowed = ("B1", "B2", "B3", "B4", "C1")
+    if value.strip().lower() == "all":
+        return list(allowed)
+    labels = {item.strip().upper() for item in value.split(",") if item.strip()}
+    invalid = labels - set(allowed)
+    if invalid:
+        raise ValueError(f"tables must be a subset of B1,B2,B3,B4,C1; invalid={sorted(invalid)}")
+    return [label for label in allowed if label in labels]
+
+
+def descriptive_table(frame: pd.DataFrame, date_column: str, features: list[str]) -> pd.DataFrame:
+    """Inclusive paper horizon; sample std (ddof=1), unbiased sample skew.
+
+    Report dates and index trading dates are different fields: the index's
+    qid_date is the preceding day and must not be used for B3/B4 filtering.
+    Missing numeric observations are not imputed or silently counted.
+    """
+    dates = pd.to_datetime(frame[date_column].astype(str), errors="raise")
+    mask = dates.between(pd.Timestamp(str(LONG_START)), pd.Timestamp(str(TEST_END)))
+    data, dates = frame.loc[mask], dates.loc[mask]
+    if data.empty:
+        raise ValueError("No observations in the appendix descriptive-statistics horizon")
+    count_label = "Number of samples" if date_column == "qid_date" else "Number of trading days"
+    records = [{
+        "Feature variables": date_column,
+        "Max": f"{dates.max().year}/{dates.max().month}/{dates.max().day}",
+        "Min": f"{dates.min().year}/{dates.min().month}/{dates.min().day}",
+        "Median": "-", "Mean": "-", "Std.": "-", "Skewness": "-",
+        count_label: int(len(data)),
+    }]
+    for name in features:
+        values = pd.to_numeric(data[name], errors="raise")
+        display_name = {"prior_performance_avg": "prior_perform_avg"}.get(name, name)
+        records.append({
+            "Feature variables": display_name,
+            "Max": values.max(), "Min": values.min(), "Median": values.median(),
+            "Mean": values.mean(), "Std.": values.std(ddof=1), "Skewness": values.skew(),
+            count_label: int(values.count()),
+        })
+    return pd.DataFrame(records)
+
+
+def current_hyperparameter_table() -> pd.DataFrame:
+    """Export the three-year configuration, without claiming a new search.
+
+    Ranges are metadata declared in manuscript Table C1. Selected values are
+    read from the actual model factories/configuration used for T4.
+    """
+    rows = []
+
+    def add(model: str, parameter: str, search_range: str, value: object) -> None:
+        rows.append({"Models": model, "Hyperparameter": parameter,
+                     "Range (manuscript)": search_range, "Selected choice": value})
+
+    params = model_for_baseline("LR", "Main", 3, 42).get_params()
+    add("Lasso regression", "Penalty item", "[1e-5, 1e-2]", params["alpha"])
+    params = model_for_baseline("SVM_R", "Main", 3, 42).get_params()
+    add("SVM", "Kernel type", "{rbf, linear, poly}", params["kernel"])
+    params = model_for_baseline("MLP_R", "Main", 3, 42).get_params()
+    add("MLP (Regression)", "Hidden layer size", "[6, 48]", params["hidden_layer_sizes"][0])
+    for market in MARKET_ORDER:
+        params = model_for_baseline("MLP_C", market, 3, 42).get_params()
+        add(f"MLP (Classification & {MARKET_TITLES[market]})", "Hidden layer size", "[6, 48]", params["hidden_layer_sizes"][0])
+    fields = (("n_estimators", "Weak learner number", "[50, 500]"),
+              ("max_depth", "Maximum depth of the tree", "[2, 10]"),
+              ("learning_rate", "Learning rate", "[1e-4, 1e-1]"))
+    for kind, label in (("XGB_R", "Regression"), ("XGB_C", "Classification")):
+        for market in MARKET_ORDER:
+            params = model_for_baseline(kind, market, 3, 42).get_params()
+            for name, description, search_range in fields:
+                add(f"XGBoost ({label} & {MARKET_TITLES[market]})", description, search_range, params[name])
+    for market in MARKET_ORDER:
+        params = PAPER_HYPERPARAMETERS["LambdaRank"][MARKET_CODES[market]]
+        add(f"LambdaRank ({MARKET_TITLES[market]})", "Learning rate", "[1e-4, 1e-1]", params["learning_rate"])
+    for market in MARKET_ORDER:
+        params = PAPER_HYPERPARAMETERS["LambdaMART"][MARKET_CODES[market]]
+        for name, description, search_range in fields:
+            search_range = {"n_estimators": "[800, 1200]", "max_depth": "[4, 8]"}.get(name, search_range)
+            add(f"LambdaMART ({MARKET_TITLES[market]})", description, search_range, params[name])
+    add("LTR-DQN", "Learning rate", "[1e-4, 1e-1]", PAPER_HYPERPARAMETERS["LTR-DQN"]["learning_rate"])
+    return pd.DataFrame(rows)
+
+
+def export_appendix_tables(labels: list[str], output_dir: Path) -> dict:
+    """Always compute from tracked raw inputs/configuration, never cached tables."""
+    from openpyxl.styles import Alignment, Border, Font, Side
+    from openpyxl.utils import get_column_letter
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tables, sources = {}, {}
+    report_features = ["page", "title_len", "num_sentence", "avg_sentence_len", "sd_sentence_len",
+                       "star_analyst", "num_authors", "analyst_coverage", "broker_size", "listed",
+                       "prior_performance_avg", "prior_performance_sd", "broker_status", "advance_reaction",
+                       "rm_rf", "smb", "hml", "rmw", "cma", *[f"ind_{i}" for i in range(1, 7)], "real_return"]
+    assert set(report_features) == set(FEATURES) | {"real_return"}
+    for label in labels:
+        if label == "C1":
+            tables[label] = current_hyperparameter_table()
+            continue
+        market = "Main" if label in {"B1", "B3"} else "ChiNext"
+        code = MARKET_CODES[market]
+        if label in {"B1", "B2"}:
+            path = DATA_DIR / f"{code}merge_open_close_final.csv"
+            date_column, features = "qid_date", report_features
+        else:
+            path = DATA_DIR / "dapan" / f"{code}merge.csv"
+            date_column, features = "trade_date", ["open", "high", "low", "close", "vol", "amount", "pct_chg", "group_len"]
+        frame = pd.read_csv(require_file(path, f"Table {label}"), usecols=[date_column, *features])
+        tables[label] = descriptive_table(frame, date_column, features)
+        sources[path.relative_to(CODE_DIR).as_posix()] = sha256(path)
+    if "C1" in labels:
+        for path in (CODE_DIR / "experiment_core.py", ACTIVE_PARAMETER_FILE):
+            sources[path.relative_to(CODE_DIR).as_posix()] = sha256(path)
+    notes = {
+        "B1_B4": "Inclusive 2017-12-06 to 2023-03-03. Reports use qid_date; indices use trade_date. No imputation. Std: ddof=1; skew: unbiased sample skewness; counts exclude missing values per feature.",
+        "C1": "Three-year (T4) selected settings read from current code. Ranges are manuscript metadata, not proof of an optimization run. This command does not retrain or run a new hyperparameter search. The current LambdaRank rates are 0.01 (Main) / 0.1 (ChiNext), rather than the manuscript's older 0.002 / 0.001.",
+    }
+    outputs = {}
+    workbook_path = output_dir / "appendix_tables.xlsx"
+    with pd.ExcelWriter(workbook_path, engine="openpyxl") as writer:
+        fixed = datetime(2000, 1, 1)
+        writer.book.properties.creator = "LTR-DQN"
+        writer.book.properties.created = writer.book.properties.modified = fixed
+        for label, table in tables.items():
+            csv_path = output_dir / f"Table_{label}.csv"
+            table.to_csv(csv_path, index=False, encoding="utf-8-sig", float_format="%.12g", line_terminator="\n")
+            outputs[csv_path.name] = sha256(csv_path)
+            table.to_excel(writer, sheet_name=label, index=False, na_rep="-")
+            sheet = writer.sheets[label]
+            sheet.freeze_panes = "B2"
+            sheet.sheet_view.showGridLines = False
+            sheet.auto_filter.ref = sheet.dimensions
+            sheet.row_dimensions[1].height = 32
+            for column in range(1, len(table.columns) + 1):
+                sheet.column_dimensions[get_column_letter(column)].width = (
+                    54 if label == "C1" and column == 1 else
+                    32 if column == 1 or label == "C1" else 23 if column == 8 else 19
+                )
+            for row in sheet:
+                for cell in row:
+                    cell.font = Font(name="Times New Roman", size=11, bold=cell.row == 1)
+                    cell.alignment = Alignment(horizontal="left" if cell.column == 1 else "center", vertical="center", wrap_text=cell.row == 1)
+                    if cell.row == 1:
+                        cell.border = Border(top=Side(style="medium"), bottom=Side(style="thin"))
+                    if isinstance(cell.value, (int, float)):
+                        cell.number_format = "0" if cell.column == 8 else "0.######"
+            sheet.print_options.horizontalCentered = True
+            sheet.sheet_properties.pageSetUpPr.fitToPage = True
+            sheet.page_setup.orientation = "landscape"
+            sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
+            sheet.page_setup.fitToWidth, sheet.page_setup.fitToHeight = 1, 0
+            sheet.print_title_rows = "1:1"
+        pd.DataFrame([{"Table": label, "Method": text} for label, text in notes.items()
+                      if (label == "C1" and label in labels) or (label == "B1_B4" and any(x.startswith("B") for x in labels))]).to_excel(writer, sheet_name="Notes", index=False)
+        writer.sheets["Notes"].column_dimensions["A"].width = 15
+        writer.sheets["Notes"].column_dimensions["B"].width = 100
+        for row in writer.sheets["Notes"].iter_rows(min_row=2):
+            row[1].alignment = Alignment(wrap_text=True, vertical="top")
+            writer.sheets["Notes"].row_dimensions[row[1].row].height = 75
+    _stabilize_xlsx(workbook_path)
+    outputs[workbook_path.name] = sha256(workbook_path)
+    manifest = {"tables": labels, "runtime": runtime_versions(), "sources": sources,
+                "notes": notes, "outputs": outputs,
+                "implementation_sha256": sha256(Path(__file__))}
+    (output_dir / "appendix_tables_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
 
 
 def require_file(path: Path, purpose: str) -> Path:
@@ -862,6 +1045,14 @@ def main() -> None:
     args = parse_args()
     validate_runtime()
     figures = selected_figures(args.figures)
+    tables = selected_tables(args.tables)
+    if not figures and not tables:
+        raise ValueError("Select at least one appendix figure or table")
+    if tables:
+        table_manifest = export_appendix_tables(tables, args.tables_output_dir.resolve())
+        print(json.dumps(table_manifest, indent=2))
+    if not figures:
+        return
     run_dir = args.run_dir.resolve()
     output_dir = args.output_dir.resolve()
     data_dir = output_dir / "data"

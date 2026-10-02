@@ -16,7 +16,7 @@
 - `main.py`：读取本次训练产物，训练快速基线模型，重新生成 DQN 动作，并输出 T3、T4、T5、T7 Results。
 - `T6_main.py`：检查 T6 原始采样 CSV 并输出 T6 工作簿，同时包含 T6 的采样和回测实现。
 - `Fig_main.py`：根据当前运行结果重新生成正文图 3-7 及其审计 CSV。
-- `Appendix_Fig_main.py`：重新生成附录图 C1-C5 及其审计 CSV，C4 使用本次新生成的 T6 原始结果。
+- `Appendix_Fig_main.py`：重新生成附录图 C1-C5 和附录表 B1–B4、C1，C4 使用本次新生成的 T6 原始结果。
 
 ### 共享实现
 
@@ -168,10 +168,20 @@ python Fig_main.py --ranker_tree_method approx --force
 ### 4. 生成附录图 C1、C2、C3、C5
 
 ```powershell
-python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
+python Appendix_Fig_main.py --figures C1,C2,C3,C5 --tables all --force
 ```
 
 输出目录：`results/appendix_figures/`。
+
+附录表 B1–B4 和 C1 同时导出到 `results/appendix_tables/appendix_tables.xlsx`，各表另有 CSV 和输入哈希清单。也可以不训练、不绘图，单独生成附录表：
+
+```powershell
+python Appendix_Fig_main.py --figures none --tables all
+```
+
+B1–B4 每次从原始数据计算 2017-12-06 至 2023-03-03 的描述统计。研报按 `qid_date` 筛选，指数按 `trade_date` 筛选；标准差使用样本标准差（ddof=1），偏度使用无偏样本偏度，缺失值不填补。B4 如与论文旧表不同，以当前原始数据的计算值为准。
+
+C1 导出当前三年期 T4 配置实际采用的参数。范围列注明为论文声明的范围，导出配置并不执行新的寻优，也不把配置声称为重新搜索的最优值。当前 RANK 学习率为主板 `0.01`、创业板 `0.1`，与 0910 R5 附录旧表的 `0.002`、`0.001` 不同；模型算法及参数没有因导出此表而改动。
 
 ### 5. 单独生成 T6 和附录 C4
 
@@ -220,6 +230,7 @@ results/combined/results.xlsx       T3、T4、T5、T7 总工作簿
 results/combined/                   论文格式 CSV 和运行清单
 results/figures/                    全部正文图及审计 CSV
 results/appendix_figures/           附录 C1、C2、C3、C5 及审计 CSV
+results/appendix_tables/            附录表 B1–B4、C1 工作簿、CSV 和输入哈希
 ```
 
 ### 4. 单独运行 T6 和附录 C4

@@ -4,7 +4,7 @@
 
 在线复现分为两个独立任务：
 
-- **1 - One-click Results and Figures (Windows CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5。
+- **1 - One-click Results and Figures (Windows CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5 和附录表 B1–B4、C1。
 - **2 - One-click T6 and Figure C4 (Windows CPU)**：单独生成 T6 和附录图 C4。
 
 两个任务都固定使用标准 Windows Server 2022 x64 CPU，作为论文结果参考环境。工作流会自动检查系统并确认读取 `parameters_windows.txt`，无需创建或选择 runner，也无需选择 GPU。Linux 应急兼容只允许在本地或租用服务器通过 shell 脚本运行。
@@ -60,6 +60,7 @@ results/combined/results.xlsx       T3、T4、T5、T7 总工作簿
 results/combined/                   论文格式 CSV 和运行清单
 results/figures/                    全部正文图及审计 CSV
 results/appendix_figures/           附录图 C1、C2、C3、C5 及审计 CSV
+results/appendix_tables/            附录表 B1–B4、C1 工作簿、CSV 和输入哈希
 ```
 
 这不是读取已上传的模型或历史结果：每次运行都会从仓库跟踪的原始数据开始重新训练。

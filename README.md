@@ -226,10 +226,28 @@ Output: `results/figures/`.
 ### 4. Generate Appendix Figures C1, C2, C3 and C5
 
 ```powershell
-python Appendix_Fig_main.py --figures C1,C2,C3,C5 --force
+python Appendix_Fig_main.py --figures C1,C2,C3,C5 --tables all --force
 ```
 
-Output: `results/appendix_figures/`.
+Output: `results/appendix_figures/` and `results/appendix_tables/`.
+
+Tables B1-B4 are recomputed from raw data over the inclusive 2017-12-06 to
+2023-03-03 horizon. Reports use `qid_date`; indices use `trade_date` (not the
+preceding `qid_date`). Standard deviation uses ddof=1, skewness is unbiased
+sample skewness, and missing numeric values are not imputed. Table C1 exports
+the current three-year T4 model settings. Its ranges are manuscript metadata,
+and this export does not perform a new optimization or claim those choices
+were freshly optimized. Current LambdaRank learning rates are 0.01 / 0.1,
+whereas the older 0910 R5 appendix lists 0.002 / 0.001. B4 reflects the current
+raw index data even where its statistics differ from the older manuscript.
+The model algorithms, settings and raw data are unchanged by the table export.
+
+The core one-click workflow includes all five appendix tables (XLSX, individual
+CSVs and input/output hashes). To export just these tables without training:
+
+```powershell
+python Appendix_Fig_main.py --figures none --tables all
+```
 
 When the two institution-level brokerage workbooks are present in `data/`, C2
 automatically uses the `institution` column and the original daily-mean return
