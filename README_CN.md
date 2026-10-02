@@ -4,7 +4,7 @@
 
 **[新 GitHub 账号一键复现指南](GITHUB_ACTIONS_GUIDE_CN.md)**：从 Fork 本仓库、启用 Actions、运行 Results/T6，到下载表格和图片的完整操作步骤。
 
-本仓库用于从原始数据复现论文中的 T3、T4、T5、T6、T7 表格、正文图和附录图 C1-C5。每次运行都会重新训练排序模型和 DQN，不依赖已生成的结果、中间模型、每日选择文件或历史 `meiri_xuanze` 文件。
+本仓库用于复现论文中的 T3、T4、T5、T6、T7 表格、正文图和附录图 C1-C5。每次运行都会从股票特征重新训练排序模型和 DQN，不读取已有检查点或固定每日选择文件。T7 的 ESG 组合沿用提供的历史排序面板预测值，并使用本次新训练的 DQN 生成每日动作；面板里的 `prediction` 不由 `train.py` 重新计算。
 
 **正式参考环境：**论文复现以 Windows 10/11 x64 CPU 和 `parameters_windows.txt` 为准，本地复现和 GitHub Actions 均使用这套 Windows 流程。
 
@@ -30,7 +30,7 @@
 - `data/0060merge_T4.csv`、`data/3068merge_T4.csv`：论文表格使用的指数/参考序列。
 - `data/0060merge.csv`、`data/3068merge.csv`：基线、绘图和 T6 回测使用的市场数据。
 - `data/dapan/`：基线和 DQN 回测使用的大盘数据。
-- `data/ESG/`：T7 和附录 C5 使用的原始 ESG 排序输入。
+- `data/ESG/`：ESG 原始分数及 T7 和附录 C5 使用的历史排序面板输入。
 - `data/reproducibility/`：T6 使用的两张 20-seed 配置表，只记录运行所需种子，不保存拟合结果或固定选择结果。
 - `.github/workflows/reproduce-core.yml`、`reproduce-t6.yml`：Windows CPU 参考复现工作流。
 
@@ -179,9 +179,9 @@ python Appendix_Fig_main.py --figures C1,C2,C3,C5 --tables all --force
 python Appendix_Fig_main.py --figures none --tables all
 ```
 
-B1–B4 每次从原始数据计算 2017-12-06 至 2023-03-03 的描述统计。研报按 `qid_date` 筛选，指数按 `trade_date` 筛选；标准差使用样本标准差（ddof=1），偏度使用无偏样本偏度，缺失值不填补。B4 如与论文旧表不同，以当前原始数据的计算值为准。
+B1–B4 每次从原始数据计算 2017-12-06 至 2023-03-03 的描述统计。B4 共1272个交易日，不纳入3月6、7日；统计值以这1272条原始数据的计算结果为准，因此部分值与论文旧表不同。研报按 `qid_date` 筛选，指数按 `trade_date` 筛选；标准差使用样本标准差（ddof=1），偏度使用无偏样本偏度，缺失值不填补。
 
-C1 导出当前三年期 T4 配置实际采用的参数。范围列注明为论文声明的范围，导出配置并不执行新的寻优，也不把配置声称为重新搜索的最优值。当前 RANK 学习率为主板 `0.01`、创业板 `0.1`，与 0910 R5 附录旧表的 `0.002`、`0.001` 不同；模型算法及参数没有因导出此表而改动。
+C1 导出当前三年期 T4 配置实际采用的参数。范围列注明为论文声明的范围，导出配置并不执行新的寻优，也不把配置声称为重新搜索的最优值。RANK 学习率为主板 `0.002`、创业板 `0.001`，T4、T5和敏感性分析选定点保持一致。
 
 ### 5. 单独生成 T6 和附录 C4
 
@@ -273,6 +273,8 @@ Artifacts 保留 14 天。运行结果不会出现在仓库源文件列表中，
 需要更细的页面操作说明和最终核对清单时，可继续查看 [GITHUB_ACTIONS_GUIDE_CN.md](GITHUB_ACTIONS_GUIDE_CN.md)。
 
 ## 复现注意事项
+
+- RANK 使用主板学习率 `0.002`、创业板 `0.001`，树深、树数及列采样配置位于 `parameters_windows.txt`。两年期和四年期参数选择参考旧版 T5 的五项指标，是结果校准，不能作为独立测试集验证或全局最优的证据。三年期也采用这两个学习率，与敏感性分析选定点和更新后的T4对应。
 
 - Windows 正式复现配置位于 `parameters_windows.txt`；T6 种子表在 `data/reproducibility/`。
 - LambdaRank、LambdaMART 每次都从原始数据重新训练；DQN 使用同一次运行产生的 LambdaMART 输出。

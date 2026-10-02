@@ -160,8 +160,8 @@ def dqn_ranking_path(run_dir: Path, market: str, year: int, split: str) -> Path:
 
 PAPER_HYPERPARAMETERS = {
     "LambdaRank": {
-        "0060": {"learning_rate": 0.01},
-        "3068": {"learning_rate": 0.1},
+        "0060": {"learning_rate": 0.002},
+        "3068": {"learning_rate": 0.001},
     },
     "LambdaMART": {
         "0060": {"learning_rate": 0.001, "max_depth": 5, "n_estimators": 1000},

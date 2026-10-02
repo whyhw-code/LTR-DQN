@@ -274,7 +274,10 @@ def main() -> None:
                         "model": model_name,
                         "seed": model_seed,
                         "tree_method": model_tree_method,
-                        "paper_parameters": PAPER_HYPERPARAMETERS[model_name][MARKETS[market]],
+                        "paper_parameters": {
+                            **PAPER_HYPERPARAMETERS[model_name][MARKETS[market]],
+                            "learning_rate": model.get_params()["learning_rate"],
+                        },
                         "source_entrypoint_parameters": (
                             T4_MART_HYPERPARAMETERS[MARKETS[market]]
                             if model_name == "LambdaMART" and year == 3 else None

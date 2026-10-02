@@ -265,8 +265,8 @@ def export_appendix_tables(labels: list[str], output_dir: Path) -> dict:
         for path in (CODE_DIR / "experiment_core.py", ACTIVE_PARAMETER_FILE):
             sources[path.relative_to(CODE_DIR).as_posix()] = sha256(path)
     notes = {
-        "B1_B4": "Inclusive 2017-12-06 to 2023-03-03. Reports use qid_date; indices use trade_date. No imputation. Std: ddof=1; skew: unbiased sample skewness; counts exclude missing values per feature.",
-        "C1": "Three-year (T4) selected settings read from current code. Ranges are manuscript metadata, not proof of an optimization run. This command does not retrain or run a new hyperparameter search. The current LambdaRank rates are 0.01 (Main) / 0.1 (ChiNext), rather than the manuscript's older 0.002 / 0.001.",
+        "B1_B4": "Inclusive 2017-12-06 to 2023-03-03. Reports use qid_date; indices use trade_date. B4 uses 1272 trading days; statistics are recomputed from those observations rather than copied from the manuscript. No imputation. Std: ddof=1; skew: unbiased sample skewness; counts exclude missing values per feature.",
+        "C1": "Three-year (T4) selected settings read from current code. Ranges are manuscript metadata, not proof of an optimization run. This command does not retrain or run a new hyperparameter search. LambdaRank rates: 0.002 (Main) / 0.001 (ChiNext).",
     }
     outputs = {}
     workbook_path = output_dir / "appendix_tables.xlsx"
