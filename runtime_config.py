@@ -56,7 +56,6 @@ LOCKED_RUNTIME = {
 CODE_DIR = Path(__file__).resolve().parent
 PLATFORM_PARAMETER_FILES = {
     "Windows": CODE_DIR / "parameters_windows.txt",
-    "Linux": CODE_DIR / "parameters_linux.txt",
 }
 _MARKETS = {"0060", "3068"}
 _YEARS = {"2", "3", "4"}
@@ -70,7 +69,7 @@ _MART_FIELDS = {
 
 
 def parameter_file_for_system(system_name: str | None = None) -> Path:
-    """Return the tracked parameter file selected by the host OS."""
+    """Require Windows and return its tracked reference parameter file."""
     detected = platform.system() if system_name is None else str(system_name)
     try:
         return PLATFORM_PARAMETER_FILES[detected]
@@ -155,7 +154,7 @@ def _validate_platform_parameters(config: object, path: Path, system_name: str) 
 
 
 def load_platform_parameters(system_name: str | None = None) -> dict:
-    """Detect the host OS and load its tracked JSON-formatted text profile."""
+    """Require the Windows host and load its reference profile."""
     detected = platform.system() if system_name is None else str(system_name)
     path = parameter_file_for_system(detected)
     if not path.is_file():
@@ -174,7 +173,7 @@ ACTIVE_PLATFORM_PARAMETERS = load_platform_parameters(ACTIVE_SYSTEM)
 ACTIVE_PLATFORM_PROFILE = ACTIVE_PLATFORM_PARAMETERS["profile"]
 ACTIVE_PARAMETER_SHA256 = hashlib.sha256(ACTIVE_PARAMETER_FILE.read_bytes()).hexdigest()
 
-# These three sections are the only platform-dependent defaults. Parameters
+# These three sections use the Windows reference defaults. Parameters
 # reported by the paper remain locked in experiment_core.py and train.py.
 DEFAULT_STAGE_SEEDS = json.loads(json.dumps(ACTIVE_PLATFORM_PARAMETERS["stage_seeds"]))
 DEFAULT_RANK_CONFIG = json.loads(json.dumps(ACTIVE_PLATFORM_PARAMETERS["rank_config"]))

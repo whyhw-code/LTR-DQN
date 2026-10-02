@@ -7,9 +7,10 @@ figures, and Appendix Figures C1-C5. Every run starts from the tracked source
 data and trains fresh rankers and DQN models. No fitted model, result workbook,
 daily action file, or historical `meiri_xuanze` selection file is required.
 
-**Reference environment:** Windows 10/11 x64 CPU using
+**Supported environment:** Windows 10/11 x64 CPU using
 `parameters_windows.txt`. Local reproduction and GitHub Actions both follow
-this Windows reference workflow.
+this Windows reference workflow. Other operating systems are rejected by the
+entry points.
 
 ## Repository layout
 

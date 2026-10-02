@@ -1,4 +1,4 @@
-"""Small cross-platform checks that do not require a training run."""
+"""Windows reference checks that do not require a training run."""
 
 import json
 import platform
@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-class CrossPlatformConfigurationTest(unittest.TestCase):
+class WindowsConfigurationTest(unittest.TestCase):
     def test_source_data_and_entrypoints_are_relative_to_repository(self):
         from experiment_core import CODE_DIR, DATA_DIR
 
@@ -58,45 +58,30 @@ class CrossPlatformConfigurationTest(unittest.TestCase):
             parameter_file_for_system,
         )
 
-        expected_profiles = {
-            "Windows": "windows-reference",
-            "Linux": "linux-emergency-compatibility",
-        }
         detected = platform.system()
-        self.assertIn(detected, expected_profiles)
+        self.assertEqual(detected, "Windows")
         self.assertEqual(ACTIVE_PARAMETER_FILE, parameter_file_for_system(detected))
-        self.assertEqual(ACTIVE_PLATFORM_PROFILE, expected_profiles[detected])
+        self.assertEqual(ACTIVE_PLATFORM_PROFILE, "windows-reference")
 
-    def test_windows_and_linux_parameter_profiles_are_valid_and_distinct(self):
+    def test_windows_parameter_profile_is_valid(self):
         from runtime_config import load_platform_parameters, parameter_file_for_system
 
         windows = load_platform_parameters("Windows")
-        linux = load_platform_parameters("Linux")
         self.assertEqual(parameter_file_for_system("Windows").name, "parameters_windows.txt")
-        self.assertEqual(parameter_file_for_system("Linux").name, "parameters_linux.txt")
         self.assertEqual(windows["profile"], "windows-reference")
-        self.assertEqual(linux["profile"], "linux-emergency-compatibility")
         self.assertEqual(windows["stage_seeds"]["0060"]["4"]["evaluation"], 59)
-        self.assertEqual(linux["stage_seeds"]["0060"]["4"]["evaluation"], 5)
-        self.assertNotEqual(windows["stage_seeds"], linux["stage_seeds"])
-        for config in (windows, linux):
-            # Paper-reported learning rates remain in experiment_core.py and
-            # cannot diverge between the two platform profiles.
-            self.assertNotIn("learning_rate", json.dumps(config))
+        self.assertNotIn("learning_rate", json.dumps(windows))
 
         with patch("runtime_config.platform.system", return_value="Windows"):
             self.assertEqual(load_platform_parameters()["profile"], "windows-reference")
-        with patch("runtime_config.platform.system", return_value="Linux"):
-            self.assertEqual(
-                load_platform_parameters()["profile"],
-                "linux-emergency-compatibility",
-            )
 
     def test_unsupported_operating_system_fails_closed(self):
         from runtime_config import parameter_file_for_system
 
-        with self.assertRaisesRegex(RuntimeError, "Unsupported operating system"):
-            parameter_file_for_system("Darwin")
+        for system in ("Darwin", "unsupported"):
+            with self.subTest(system=system):
+                with self.assertRaisesRegex(RuntimeError, "Unsupported operating system"):
+                    parameter_file_for_system(system)
 
     def test_github_actions_are_windows_only(self):
         workflow_dir = ROOT / ".github" / "workflows"
@@ -113,16 +98,20 @@ class CrossPlatformConfigurationTest(unittest.TestCase):
             self.assertNotIn("ubuntu-", content, path.name)
             self.assertIn("windows-reference", content, path.name)
 
-    def test_linux_local_support_files_exist(self):
-        for name in (
-            "requirements-linux.txt",
-            "environment-linux.yml",
-            "run_linux.sh",
-            "run_t6_linux.sh",
-            "parameters_linux.txt",
-            "parameters_windows.txt",
-        ):
-            self.assertTrue((ROOT / name).is_file(), name)
+    def test_only_windows_profile_is_supported(self):
+        from runtime_config import PLATFORM_PARAMETER_FILES, load_platform_parameters
+
+        self.assertEqual(set(PLATFORM_PARAMETER_FILES), {"Windows"})
+        with patch("runtime_config.platform.system", return_value="unsupported"):
+            with self.assertRaisesRegex(RuntimeError, "Unsupported operating system"):
+                load_platform_parameters()
+
+    def test_runtime_version_mismatch_is_rejected(self):
+        from experiment_core import validate_runtime
+
+        with patch("experiment_core.platform.python_version", return_value="3.10.0"):
+            with self.assertRaisesRegex(RuntimeError, "Locked reproduction environment mismatch"):
+                validate_runtime()
 
 
 if __name__ == "__main__":

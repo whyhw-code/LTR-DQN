@@ -7,7 +7,7 @@
 - **1 - One-click Results and Figures (Windows CPU)**：生成 T3、T4、T5、T7、全部正文图，以及附录图 C1、C2、C3、C5 和附录表 B1–B4、C1。
 - **2 - One-click T6 and Figure C4 (Windows CPU)**：单独生成 T6 和附录图 C4。
 
-两个任务都固定使用标准 Windows Server 2022 x64 CPU，作为论文结果参考环境。工作流会自动检查系统并确认读取 `parameters_windows.txt`，无需创建或选择 runner，也无需选择 GPU。Linux 应急兼容只允许在本地或租用服务器通过 shell 脚本运行。
+两个任务都固定使用标准 Windows Server 2022 x64 CPU，作为论文结果参考环境。工作流会自动检查系统并确认读取 `parameters_windows.txt`，无需创建或选择 runner，也无需选择 GPU。仓库仅支持 Windows，入口脚本会拒绝其他操作系统。
 
 ## 一、准备新账号
 
@@ -15,7 +15,7 @@
 2. 打开原仓库：<https://github.com/whyhw-code/LTR-DQN>。
 3. 仓库只有 `main` 分支，不需要判断或选择其他分支。
 
-建议将复现仓库保持为 **Public（公开）**。本项目使用标准 Windows GitHub-hosted runner；公开仓库使用这种标准 runner 不收取 GitHub Actions 运行分钟费用。请勿把工作流改成 Linux、larger runner、GPU runner 或自托管付费设备。
+建议将复现仓库保持为 **Public（公开）**。本项目使用标准 Windows GitHub-hosted runner；公开仓库使用这种标准 runner 不收取 GitHub Actions 运行分钟费用。保持 `windows-2022`，请勿改用 larger runner、GPU runner 或自托管付费设备。
 
 ## 二、复制仓库到新账号
 

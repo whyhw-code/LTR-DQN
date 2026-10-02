@@ -231,7 +231,7 @@ def runtime_versions() -> dict[str, str]:
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "runtime_mode": "linux-compat" if platform.system() == "Linux" else "locked",
+        "runtime_mode": "locked",
         "machine": platform.machine(),
         "processor": platform.processor(),
         "numpy": np.__version__,
@@ -281,10 +281,6 @@ def validate_runtime() -> None:
             f"{name}={found!r} (required {expected!r})"
             for name, (expected, found) in mismatches.items()
         )
-        if os.environ.get("LTR_DQN_RELAXED_RUNTIME") == "1":
-            # The manifest records the actual versions; keep the result stream
-            # free of warning text when relaxed mode is explicitly requested.
-            return
         raise RuntimeError(
             "Locked reproduction environment mismatch: " + details + ". "
             "Create the environment from requirements-lock.txt or environment.yml; "

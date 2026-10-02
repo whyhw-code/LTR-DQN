@@ -6,7 +6,7 @@
 
 本仓库用于复现论文中的 T3、T4、T5、T6、T7 表格、正文图和附录图 C1-C5。每次运行都会从股票特征重新训练排序模型和 DQN，不读取已有检查点或固定每日选择文件。T7 的 ESG 组合沿用提供的历史排序面板预测值，并使用本次新训练的 DQN 生成每日动作；面板里的 `prediction` 不由 `train.py` 重新计算。
 
-**正式参考环境：**论文复现以 Windows 10/11 x64 CPU 和 `parameters_windows.txt` 为准，本地复现和 GitHub Actions 均使用这套 Windows 流程。
+**正式参考环境：**仅支持 Windows 10/11 x64 CPU 和 `parameters_windows.txt`，本地复现和 GitHub Actions 均使用这套 Windows 流程。入口脚本会拒绝其他操作系统。
 
 ## 文件结构
 
