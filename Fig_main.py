@@ -86,6 +86,14 @@ F4_SENSITIVITY_FIXED = {
     "Main": {"n_estimators": {"max_depth": 3}},
     "ChiNext": {"learning_rate": {"reg_lambda": 10.0}},
 }
+# Figure 7 reports the importance of the MART ranking component inside
+# LTR-DQN.  Its original XGBoost implementation is a tree booster trained
+# with pairwise lambda gradients.  max_bin must be explicit: XGBoost 1.7.6
+# produces a different approx sketch when the nominal default is omitted.
+F7_MART_PARAMETERS = {
+    "0060": {"learning_rate": 0.01, "max_depth": 6, "n_estimators": 100, "max_bin": 256},
+    "3068": {"learning_rate": 0.1, "max_depth": 6, "n_estimators": 100, "max_bin": 256},
+}
 COLORS = {
     # Manuscript colours for the two-market sensitivity panels (Figures 3-4).
     "Main": "#4472C4",
@@ -273,7 +281,11 @@ def fit_ranker_variant(
     x_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[FEATURES])
     y_scaler = MinMaxScaler(feature_range=(-1, 1)).fit(combined[["real_return"]])
     params = {
-        "objective": "rank:pairwise" if model_name == "LambdaRank" else lambda_mart_objective(code),
+        "objective": (
+            "rank:pairwise"
+            if model_name in {"LambdaRank", "LambdaMARTPairwise"}
+            else lambda_mart_objective(code)
+        ),
         "tree_method": resolved_tree_method,
         "booster": "gbtree",
         "eval_metric": "ndcg",
@@ -898,9 +910,18 @@ def compute_feature_importance(
     force: bool,
 ) -> pd.DataFrame:
     signature = seed_signature(seed_config, seed_override)
+    mart_signature = digest_text({
+        "parameters": F7_MART_PARAMETERS,
+        "objective": "rank:pairwise",
+        "tree_method": tree_method,
+    })
     cached = cached_csv(
         data_path, force,
-        {"tree_method": tree_method, "seed_signature": signature},
+        {
+            "tree_method": tree_method,
+            "seed_signature": signature,
+            "mart_config_signature": mart_signature,
+        },
     )
     if cached is not None:
         return cached
@@ -923,17 +944,19 @@ def compute_feature_importance(
             n_jobs=1,
         )
         xgb_model.fit(x_train, y_train)
-        rank_model, _ = fit_ranker_variant(
+        mart_params = F7_MART_PARAMETERS[code]
+        mart_model, _ = fit_ranker_variant(
             market,
-            "LambdaRank",
-            learning_rate=PAPER_HYPERPARAMETERS["LambdaRank"][code]["learning_rate"],
-            max_depth=6,
-            n_estimators=100,
-            seed=stage_seed(code, 3, "rank", seed_config, seed_override),
+            "LambdaMARTPairwise",
+            learning_rate=mart_params["learning_rate"],
+            max_depth=mart_params["max_depth"],
+            n_estimators=mart_params["n_estimators"],
+            seed=stage_seed(code, 3, "mart", seed_config, seed_override),
             tree_method=tree_method,
+            max_bin=mart_params["max_bin"],
         )
         importance = {
-            "LTR-DQN": minmax(rank_model.feature_importances_),
+            "LTR-DQN": minmax(mart_model.feature_importances_),
             "LR": minmax(np.abs(lasso.coef_)),
             "XGB_R": minmax(xgb_model.feature_importances_),
         }
@@ -944,6 +967,10 @@ def compute_feature_importance(
                     "feature": feature, "importance": float(value),
                     "tree_method": tree_method,
                     "seed_signature": signature,
+                    "mart_config_signature": mart_signature,
+                    "importance_source": (
+                        "LambdaMART" if model == "LTR-DQN" else model
+                    ),
                 })
     return save_csv(pd.DataFrame(rows), data_path)
 
