@@ -195,7 +195,7 @@ python Appendix_Fig_main.py --figures C4 --force
 
 ## GitHub Actions 在线复现
 
-在线复现不要求本地安装 Python，也不需要 GPU。两个工作流都会在标准 Windows Server 2022 x64 CPU 环境中，从干净的仓库和原始数据开始运行。
+在线复现不要求本地安装 Python，也不需要 GPU。两个工作流都会在标准 Windows Server 2022 x64 CPU 环境中，从干净的仓库和原始数据开始运行。需要注意，GitHub 会动态分配宿主 CPU；`windows-2022` 只能固定操作系统和 x64 架构，不能固定具体 CPU 型号或代际。锁定环境和单线程设置已经排除了通常的软件版本与线程调度差异，但实际验证中，偶尔分配到较旧 CPU 时仍可能出现与参考结果不同的数值；较新 CPU 的验证结果不存在这一问题。遇到这种情况时，不要修改种子或模型参数，直接在当前 `main` 分支重新新建一次运行，让 GitHub 重新分配 runner。
 
 ### 1. Fork 仓库
 
@@ -268,6 +268,7 @@ Artifacts 保留 14 天。运行结果不会出现在仓库源文件列表中，
 
 - 进入失败记录，打开对应 job，展开第一个带红叉的步骤。依赖问题通常位于 **Install locked environment**，训练或绘图问题会显示在对应名称的步骤中。
 - 如果原仓库已经更新，在自己 Fork 的首页点击 **Sync fork**，再点击 **Update branch**；同步完成后应新建一次运行。旧记录中的 **Re-run jobs** 仍会使用旧提交。
+- GitHub-hosted runner 不保证固定 CPU 型号。如果任务成功完成，但数值与参考结果存在明显差异，先在日志或 manifest 中查看 `runtime.processor`。若本次被分配到较旧 CPU，请在当前 `main` 分支重新新建一次工作流运行；新运行会重新分配 runner，实际验证中换到较新 CPU 后即可恢复参考结果。不要为了适配该次 runner 而调整种子或模型参数。
 - 如果没有 **Run workflow** 按钮，确认 Actions 已启用、工作流文件位于默认 `main` 分支，并且当前账号对这个 Fork 有写入权限。
 
 需要更细的页面操作说明和最终核对清单时，可继续查看 [GITHUB_ACTIONS_GUIDE_CN.md](GITHUB_ACTIONS_GUIDE_CN.md)。

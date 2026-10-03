@@ -284,7 +284,14 @@ an external intermediate file.
 
 No local Python installation or GPU is needed. The two workflows run on a
 standard Windows Server 2022 x64 CPU runner and start from the raw files in a
-clean checkout.
+clean checkout. GitHub dynamically assigns the physical CPU model;
+`windows-2022` fixes the operating system and x64 architecture, but not the
+CPU generation. The locked environment and single-thread settings remove the
+usual software and scheduling variation. In observed validation runs, an
+older assigned CPU could still produce a numerical result different from the
+reference, whereas newer assigned CPUs reproduced the reference result. If
+this occurs, start a new run from `main` so GitHub allocates another runner;
+do not change seeds or model parameters.
 
 ### 1. Fork the repository
 
@@ -373,6 +380,13 @@ source-file list, so they must be downloaded from the completed run page.
   fork's main page, select **Sync fork**, then **Update branch**. Start a new
   workflow run after synchronization; rerunning an old job still uses its old
   commit.
+- GitHub-hosted runners do not guarantee a fixed CPU model. If a completed run
+  succeeds but its numerical results differ materially from the reference,
+  inspect `runtime.processor` in the log or manifest. When GitHub assigned an
+  older CPU, create one new workflow run from the current `main` branch. The
+  new run receives a newly allocated runner; in observed validation, a newer
+  CPU resolved this hardware-specific difference. Do not tune seeds or model
+  parameters to compensate for the runner assignment.
 - If **Run workflow** is missing, confirm that Actions is enabled, the workflow
   file is on the default `main` branch, and the signed-in account has write
   permission to the fork.
